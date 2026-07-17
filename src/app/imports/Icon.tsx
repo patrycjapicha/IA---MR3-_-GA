@@ -1,0 +1,11 @@
+import svgPaths from "./svg-48rpyiefk1";
+
+export default function Icon() {
+  return (
+    <div className="relative w-6 h-6 m-[0px] -ml-2" data-name="Icon">
+      <svg className="block w-full h-full" fill="none" preserveAspectRatio="xMidYMid meet" viewBox="0 0 20 20">
+        <path clipRule="evenodd" d="M9.44231 6.90365V16.1985H1.75L9.44231 6.90365ZM9.44231 3.57031C9.44231 5.6857 7.71154 7.41647 5.59615 7.41647C3.48077 7.41647 1.75 5.6857 1.75 3.57031H9.44231ZM10.7244 16.1985C10.7244 14.0831 12.4551 12.3524 14.5705 12.3524C16.6859 12.3524 18.4167 14.0831 18.4167 16.1985H10.7244ZM10.7244 12.8652V3.57031H18.4167L10.7244 12.8652Z" fill="currentColor" fillRule="evenodd" id="Icon" />
+      </svg>
+    </div>
+  );
+}
