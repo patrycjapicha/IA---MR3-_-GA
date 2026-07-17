@@ -47,6 +47,10 @@ import Edit2StrokeIcon from '@zendesk-ui/assets/icons/20px/note-pencil-stroke.sv
 import Edit3Icon from '@zendesk-ui/assets/icons/20px/pencil-sparkle-fill.svg?react';
 import MonitorStrokeIcon from '@zendesk-ui/assets/icons/20px/monitor-stroke.svg?react';
 import ExternalLinkIcon from '@zendesk-ui/assets/icons/20px/external-link.svg?react';
+import BoldIcon from '@zendesk-ui/assets/icons/20px/bold.svg?react';
+import AlignLeftIcon from '@zendesk-ui/assets/icons/20px/align-left.svg?react';
+import AlignCenterIcon from '@zendesk-ui/assets/icons/20px/align-center.svg?react';
+import AlignRightIcon from '@zendesk-ui/assets/icons/20px/align-right.svg?react';
 import EyeOffIcon from '@zendesk-ui/assets/icons/20px/lock-fill.svg?react';
 import FileBarChartIcon from '@zendesk-ui/assets/icons/20px/bar-chart-square-fill.svg?react';
 import FileSpreadsheetIcon from '@zendesk-ui/assets/icons/20px/file-spreadsheet-fill.svg?react';
@@ -159,6 +163,24 @@ const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
   <ArrowLeftIcon {...props} style={{ transform: 'scaleX(-1)', ...props.style }} />
 );
 
+const UndoReturnIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" focusable="false" {...props}>
+    <path
+      fill="currentColor"
+      d="M6.07733 3.57722C6.40277 3.25179 6.93061 3.25179 7.25604 3.57722C7.58134 3.90267 7.58143 4.43054 7.25604 4.75593L5.34491 6.66609H15.0002C16.3808 6.66612 17.5001 7.7855 17.5002 9.16609V15.8331C17.5001 16.2931 17.1272 16.6659 16.6672 16.6661C16.207 16.6661 15.8333 16.2932 15.8332 15.8331V9.16609C15.8331 8.70595 15.4603 8.33312 15.0002 8.33308H5.34491L7.25604 10.2442C7.58114 10.5696 7.58127 11.0966 7.25604 11.4219C6.93063 11.7474 6.40277 11.7473 6.07733 11.4219L2.74432 8.08894C2.41888 7.7635 2.41888 7.23567 2.74432 6.91023L6.07733 3.57722Z"
+    />
+  </svg>
+);
+
+const RedoReturnIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" focusable="false" {...props}>
+    <path
+      fill="currentColor"
+      d="M13.9227 3.57722C13.5972 3.25179 13.0694 3.25179 12.744 3.57722C12.4187 3.90267 12.4186 4.43054 12.744 4.75593L14.6551 6.66609H4.99982C3.61917 6.66612 2.49992 7.7855 2.49982 9.16609V15.8331C2.49992 16.2931 2.87284 16.6659 3.33283 16.6661C3.793 16.6661 4.1667 16.2932 4.16681 15.8331V9.16609C4.16692 8.70595 4.53966 8.33312 4.99982 8.33308H14.6551L12.744 10.2442C12.4189 10.5696 12.4187 11.0966 12.744 11.4219C13.0694 11.7474 13.5972 11.7473 13.9227 11.4219L17.2557 8.08894C17.5811 7.7635 17.5811 7.23567 17.2557 6.91023L13.9227 3.57722Z"
+    />
+  </svg>
+);
+
 export const Activity = ActivityIcon;
 export const ActivityStroke = ActivityStrokeIcon;
 export const AlertCircle = AlertCircleIcon;
@@ -242,6 +264,10 @@ export const LineChart = LineChartIcon;
 export const LineChartStroke = LineChartStrokeIcon;
 export const Link = LinkIcon;
 export const List = ListIcon;
+export const Bold = BoldIcon;
+export const AlignLeft = AlignLeftIcon;
+export const AlignCenter = AlignCenterIcon;
+export const AlignRight = AlignRightIcon;
 export const LogOut = LogOutIcon;
 export const Mail = MailIcon;
 export const Maximize2 = Maximize2Icon;
@@ -316,6 +342,8 @@ export const Zap = ZapIcon;
 export const AreaChart = AreaChartIcon;
 export const Undo2 = Undo2Icon;
 export const Undo2Stroke = Undo2StrokeIcon;
+export const UndoReturn = UndoReturnIcon;
+export const RedoReturn = RedoReturnIcon;
 export const Redo2 = Redo2Icon;
 export const Globe = GlobeIcon;
 export const Grid3X3 = Grid3X3Icon;

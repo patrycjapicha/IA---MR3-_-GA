@@ -114,10 +114,8 @@ export default function App() {
   };
 
   const handleCreateReport = () => {
-    // Generate a unique ID for the new report
     const reportId = `report-${Date.now()}`;
-    
-    // Create a new report tab
+
     const newReportData = {
       id: reportId,
       title: 'New Report',
@@ -325,7 +323,6 @@ export default function App() {
                 data={{}}
                 onReportGeneration={handleReportGeneration}
                 onCreateDashboard={handleCreateDashboard}
-                onCreateReport={handleCreateReport}
                 onSectionChange={setCurrentSection}
                 onNotificationsChange={handleNotificationsChange}
                 onNavigateToExportSetup={handleNavigateToExportSetup}

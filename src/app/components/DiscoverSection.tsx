@@ -333,7 +333,6 @@ interface DiscoverSectionProps {
   handleQuickQuestion: (question: string) => void;
   onNavigateToSection?: (sectionId: string) => void;
   onCreateDashboard?: () => void;
-  onCreateReport?: () => void;
   onOpenDashboard?: (dashboardData: { id: string; title: string; data?: any }) => void;
 }
 
@@ -345,7 +344,6 @@ export function DiscoverSection({
   handleQuickQuestion,
   onNavigateToSection,
   onCreateDashboard,
-  onCreateReport,
   onOpenDashboard
 }: DiscoverSectionProps) {
   const [recentPinnedOpen, setRecentPinnedOpen] = useState(true);

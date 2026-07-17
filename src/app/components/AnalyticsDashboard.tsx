@@ -49,12 +49,11 @@ import { DatasetsSection } from './DatasetsSection';
 import { ResolutionTimeMonitoring } from './ResolutionTimeMonitoring';
 import { RealTimeMonitoring } from './RealTimeMonitoring';
 import { DashboardBuilder } from './DashboardBuilder';
-import { ReportBuilder } from './ReportBuilder';
 import { HomeSection } from './HomeSection';
 import { AlertsSection } from './AlertsSection';
 import { SettingsSection } from './SettingsSection';
 
-export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDashboard, onCreateReport, onSectionChange, onNotificationsChange, onNavigateToExportSetup, onNavigateToSection, initialSection, onOpenDashboard, activeTabId, openTabs, onOpenAnalyticsAssistant, onUpdateTabTitle, onShowLegacyTooltip }: DashboardProps) {
+export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDashboard, onSectionChange, onNotificationsChange, onNavigateToExportSetup, onNavigateToSection, initialSection, onOpenDashboard, activeTabId, openTabs, onOpenAnalyticsAssistant, onUpdateTabTitle, onShowLegacyTooltip }: DashboardProps) {
   // Simple counter for unique IDs
   const idCounterRef = React.useRef(0);
   const generateUniqueId = () => {
@@ -258,7 +257,7 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
   
   // Show dashboard builder for new dashboards OR existing dashboards without specific components
   const showDashboardBuilder = activeTab && activeTab.type === 'dashboard' && (activeTab.data?.isNew === true || (activeTab.data?.isNew === false && !showPreCreatedDashboard));
-  const showReportBuilder = activeTab && activeTab.type === 'report' && activeTab.data?.isNew === true;
+  const showReportPlaceholder = activeTab && activeTab.type === 'report';
 
   // Early return for pre-created dashboards
   if (showPreCreatedDashboard) {
@@ -350,46 +349,19 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
     );
   }
 
-  // Early return for report builder
-  if (showReportBuilder) {
+  // Early return for report tabs — empty page (no dashboard builder interface)
+  if (showReportPlaceholder) {
     return (
       <div className="h-full bg-[#F7F7F7]">
         <div className="bg-[#f6f5f4] rounded-[28px] h-full flex overflow-hidden">
-          {/* Sidebar */}
-          <DiscoverSidebar 
+          <DiscoverSidebar
             activeNavItem={activeNavItem}
             setActiveNavItem={setActiveNavItem}
+            isNavCollapsed={isNavCollapsed}
+            setIsNavCollapsed={setIsNavCollapsed}
             onNavigateToSection={onNavigateToSection}
           />
-
-          {/* Main Content */}
-          <ReportBuilder 
-            onClose={() => {
-              // Close the active tab
-              if (activeTabId) {
-                const updatedTabs = openTabs.filter(tab => tab.id !== activeTabId);
-                const newActiveTab = updatedTabs[updatedTabs.length - 1];
-                
-                if (newActiveTab) {
-                  // Switch to the last remaining tab
-                  setActiveNavItem(newActiveTab.type === 'dashboard' ? 'dashboards' : 'reports');
-                } else {
-                  // No tabs left, go back to home
-                  setActiveNavItem('home');
-                }
-              }
-            }}
-            onSave={(reportData: any) => {
-              console.log('Report saved:', reportData);
-              onUpdateTabTitle?.(activeTabId || '', reportData.name);
-              
-              if (activeTab) {
-                activeTab.data.isNew = false;
-              }
-            }}
-            initialData={activeTab?.data}
-            onOpenAnalyticsAssistant={onOpenAnalyticsAssistant}
-          />
+          <div className="flex-1 overflow-auto bg-white rounded-[24px] m-1" />
         </div>
       </div>
     );
@@ -418,7 +390,6 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
               handleQuickQuestion={() => {}}
               onNavigateToSection={(sectionId) => setActiveNavItem(sectionId)}
               onCreateDashboard={onCreateDashboard || (() => {})}
-              onCreateReport={onCreateReport || (() => {})}
               onOpenDashboard={onOpenDashboard}
             />
           </div>

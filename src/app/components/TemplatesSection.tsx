@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Button as FloraButton, IconButton, MD, Table, Tag, ToggleButton, ToggleIconButton } from '@zendesk-ui/react-components';
-import { LibraryAssetCard, type LibraryAssetCardItem } from './LibraryAssetCard';
-import { FloraSearchFilter } from './FloraSearchFilter';
-import { LibraryFilterSelect, LIBRARY_ASSET_FILTER_OPTIONS } from './LibraryFilterSelect';
+import { LibraryAssetCard, LIBRARY_CARD_MENU_BTN, type LibraryAssetCardItem } from './LibraryAssetCard';
+import { FloraSearchInput } from './FloraSearchInput';
+import { LibraryFilterSelect, LIBRARY_ASSET_FILTER_OPTIONS, LIBRARY_FILTER_BTN_CLASS, LIBRARY_FILTER_BTN_ICON_CLASS, LIBRARY_FILTER_BTN_LABEL_CLASS } from './LibraryFilterSelect';
 import { LibrarySubnavBadge } from './LibrarySubnavBadge';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -84,7 +84,7 @@ function LibrarySubnavTrailing({
   chevron?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center shrink-0">
+    <div className="flex items-center shrink-0 gap-2">
       <LibrarySubnavCount count={count} isActive={isActive} />
       <span className={LIBRARY_SUBNAV_CHEVRON_SLOT}>{chevron}</span>
     </div>
@@ -1200,7 +1200,7 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                                   onOpenDashboard({ id: item.id, title: item.title, type: 'report', data: { isNew: false, fromCard: true } });
                                 }
                               }}
-                              className="w-full flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-lg text-base text-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                              className="w-full flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-lg text-sm text-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                             >
                               {item.type === 'dashboard' && <LayoutIcon className={FLORA_LIBRARY_ICON} />}
                               {item.type === 'report' && <BarChartIcon className={FLORA_LIBRARY_ICON} />}
@@ -1286,19 +1286,18 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
             {/* Project Assets */}
             <div className="mb-6">
               <div className="mb-4 flex items-center gap-[8px]">
-                <div className="flex shrink-0 items-center gap-[16px]">
-                  <FloraSearchFilter
-                    aria-label="Search project assets"
-                    value={projectSearchQuery}
-                    onChange={(event) => setProjectSearchQuery(event.target.value)}
-                  />
-                  <LibraryFilterSelect
-                    selected={projectAssetFilter}
-                    onChange={setProjectAssetFilter}
-                    multiSelect={false}
-                    fallbackType="project"
-                  />
-                </div>
+                <FloraSearchInput
+                  aria-label="Search project assets"
+                  value={projectSearchQuery}
+                  onChange={(event) => setProjectSearchQuery(event.target.value)}
+                  width={250}
+                />
+                <LibraryFilterSelect
+                  selected={projectAssetFilter}
+                  onChange={setProjectAssetFilter}
+                  multiSelect={false}
+                  fallbackType="project"
+                />
                 <div className="flex flex-1" />
                 <div className="flex shrink-0 items-center gap-[8px]">
                   {LIBRARY_ASSET_FILTER_OPTIONS.map(({ value, label }) => (
@@ -1381,7 +1380,7 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                             menu={(
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="size-[24.5px] p-0 hover:bg-white/80">
+                                  <Button variant="ghost" size="sm" className={LIBRARY_CARD_MENU_BTN}>
                                     <MoreVertical className={FLORA_LIBRARY_ICON} />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -2038,7 +2037,7 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                               setActiveNavItem('starred');
                             }
                           }}
-                          className="w-full flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-lg text-base text-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                          className="w-full flex items-center gap-2 pl-3 pr-3 py-1.5 rounded-lg text-sm text-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                         >
                           {item.type === 'dashboard' && <LayoutIcon className={FLORA_LIBRARY_ICON} />}
                           {item.type === 'report' && <BarChartIcon className={FLORA_LIBRARY_ICON} />}
@@ -2125,11 +2124,8 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
               className="rounded-[20px] relative pt-4 pr-8 pb-4 pl-0 mb-8"
             >
               <div className="flex flex-col gap-4 max-w-3xl">
-                <div className="w-[36px] h-[36px] flex items-center justify-center">
-                  <Zendesk className="size-[12px] shrink-0 text-muted-foreground" />
-                </div>
                 <div>
-                  <h2 className="mb-3 text-foreground text-2xl font-light">Discover Zendesk built analytics assets</h2>
+                  <h2 className="mb-3 text-foreground text-2xl font-light">Discover Zendesk built analytics apps</h2>
                   <p className="text-foreground text-base leading-relaxed mb-6 max-w-2xl">
                     Access curated dashboards, reports, crafted by Zendesk analytics experts. Get started instantly with data for common support and customer service scenarios.
                   </p>
@@ -2230,19 +2226,17 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
               <>
             {/* Search, Filters, and View Toggle - All on one line */}
             <div className="flex items-center gap-[8px]">
-              <div className="flex shrink-0 items-center gap-[16px]">
-                <FloraSearchFilter
-                  aria-label="Search assets"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-
-                <LibraryFilterSelect
-                  selected={selectedAssetTypes}
-                  onChange={setSelectedAssetTypes}
-                  fallbackType="project"
-                />
-              </div>
+              <FloraSearchInput
+                aria-label="Search assets"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                width={250}
+              />
+              <LibraryFilterSelect
+                selected={selectedAssetTypes}
+                onChange={setSelectedAssetTypes}
+                fallbackType="project"
+              />
 
               <div className="flex flex-1" />
 
@@ -2287,13 +2281,11 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
               {activeNavItem !== 'recents' && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <FloraButton isBasic size="small">
-                    <MD tag="span" className="!text-foreground">
+                  <FloraButton size="small" isPill className={LIBRARY_FILTER_BTN_CLASS}>
+                    <MD tag="span" className={LIBRARY_FILTER_BTN_LABEL_CLASS}>
                       {sortBy === 'date-created' ? 'Date created' : sortBy === 'date-modified' ? 'Date modified' : 'Name'}
                     </MD>
-                    <FloraButton.EndIcon>
-                      <ChevronDown className={FLORA_TOOLBAR_BTN_ICON} />
-                    </FloraButton.EndIcon>
+                    <ChevronDown className={LIBRARY_FILTER_BTN_ICON_CLASS} aria-hidden />
                   </FloraButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[160px]">
@@ -2467,7 +2459,7 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                 const templateMenu = (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="size-[24.5px] p-0 hover:bg-white/50">
+                      <Button variant="ghost" size="sm" className={LIBRARY_CARD_MENU_BTN}>
                         <MoreVertical className={FLORA_LIBRARY_ICON} />
                       </Button>
                     </DropdownMenuTrigger>
@@ -2490,8 +2482,6 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                             {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Schedule</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
@@ -2520,7 +2510,6 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                             {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Schedule</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Pin to watchlist</DropdownMenuItem>
                         </>
@@ -2542,7 +2531,6 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                             {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Schedule</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
                         </>
                       ) : template.type === 'dataset' ? (
@@ -2573,21 +2561,22 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                   style={{ backgroundColor: '#F7F7F7', border: 'none' }}
                   onClick={openTemplate}
                 >
-                  <div className="absolute top-3 right-3 z-10">
-                    {templateMenu}
-                  </div>
-
                   <CardContent className="p-5 flex-1">
                     <div className="flex gap-4 h-full">
                       {/* Left side - Content */}
                       <div className="flex-1 flex flex-col gap-3 min-w-0">
                         {/* Icon */}
-                        <div className="flex items-center gap-2">
-                          {template.type === 'dataset' ? (
-                            <DatasetIcon className={FLORA_LIBRARY_ICON} />
-                          ) : (
-                            <Folder className={FLORA_LIBRARY_ICON} />
-                          )}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            {template.type === 'dataset' ? (
+                              <DatasetIcon className={FLORA_LIBRARY_ICON} />
+                            ) : (
+                              <Folder className={FLORA_LIBRARY_ICON} />
+                            )}
+                          </div>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            {templateMenu}
+                          </div>
                         </div>
 
                         {/* Title */}

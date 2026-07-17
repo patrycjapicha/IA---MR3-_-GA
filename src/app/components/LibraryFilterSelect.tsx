@@ -1,6 +1,12 @@
 import { Button as FloraButton, Item, ItemGroup, MD, Menu } from '@zendesk-ui/react-components';
 import { ChevronDown } from '@/components/icons/flora';
 
+export const LIBRARY_FILTER_BTN_CLASS =
+  '!h-8 shrink-0 gap-2 border border-[#999B97] bg-white px-4 hover:!bg-[#f8f9f9]';
+
+export const LIBRARY_FILTER_BTN_LABEL_CLASS = '!text-[#2F3130]';
+export const LIBRARY_FILTER_BTN_ICON_CLASS = 'size-[16px] shrink-0 text-[#646864]';
+
 export const LIBRARY_ASSET_FILTER_OPTIONS = [
   { value: 'project', label: 'Projects' },
   { value: 'dashboard', label: 'Dashboards' },
@@ -51,12 +57,12 @@ export function LibraryFilterSelect({
           {...props}
           size="small"
           isPill
-          className="!h-8 shrink-0 gap-2 border border-[#999B97] bg-white px-4 hover:!bg-[#f8f9f9]"
+          className={LIBRARY_FILTER_BTN_CLASS}
         >
-          <MD tag="span" className="!text-[#2F3130]">
+          <MD tag="span" className={LIBRARY_FILTER_BTN_LABEL_CLASS}>
             Filter
           </MD>
-          <ChevronDown className="size-[16px] shrink-0 text-[#646864]" aria-hidden />
+          <ChevronDown className={LIBRARY_FILTER_BTN_ICON_CLASS} aria-hidden />
         </FloraButton>
       )}
     >

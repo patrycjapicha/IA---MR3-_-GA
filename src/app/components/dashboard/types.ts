@@ -5,7 +5,6 @@ export interface DashboardProps {
   data: { description?: string; templateId?: string };
   onReportGeneration?: (reportData: { title: string; period: string; generated: string }) => void;
   onCreateDashboard?: () => void;
-  onCreateReport?: () => void;
   onSectionChange?: (section: string) => void;
   onNotificationsChange?: (notifications: SlackNotification[], unreadCount: number) => void;
   onNavigateToExportSetup?: () => void;

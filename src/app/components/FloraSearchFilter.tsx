@@ -17,8 +17,13 @@ export function FloraSearchFilter({
   'aria-label': ariaLabel = 'Search',
   width = 250,
 }: FloraSearchFilterProps) {
+  const resolvedWidth = typeof width === 'number' ? `${width}px` : width;
+
   return (
-    <div className="shrink-0" style={{ width, minWidth: width, maxWidth: width }}>
+    <div
+      className="flora-search-filter shrink-0"
+      style={{ width: resolvedWidth, minWidth: resolvedWidth, maxWidth: resolvedWidth }}
+    >
       <ComboboxField>
         <ComboboxField.Label hidden>{ariaLabel}</ComboboxField.Label>
         <Combobox

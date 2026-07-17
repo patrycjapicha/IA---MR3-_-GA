@@ -60,7 +60,7 @@ export function DiscoverSidebar({ activeNavItem, setActiveNavItem, isNavCollapse
           />
           <NavItem
             id="monitoring-home"
-            label="Monitoring"
+            label="Real-time monitoring"
             isActive={activeNavItem === 'monitoring-home'}
             onClick={() => handleNavItemClick('monitoring-home')}
             icon={<LineGraphIcon className={FLORA_NAV_ICON} />}
