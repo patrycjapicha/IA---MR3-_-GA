@@ -12,7 +12,7 @@ import { Card, CardContent } from './components/ui/card';
 import { Separator } from './components/ui/separator';
 import { Hash, AtSign, AlertTriangle, Bell } from '@/components/icons/flora';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { ThemeProvider } from '@zendesk-ui/react-components';
+import { ThemeProvider, Modal, Button as FloraButton } from '@zendesk-ui/react-components';
 
 // v1.0.2 - Reorganized sections
 type AppState = 'dashboard' | 'report' | 'export-setup';
@@ -55,6 +55,8 @@ export default function App() {
   const [assistantResponseType, setAssistantResponseType] = useState<'default' | 'narrate'>('default');
   const [assistantRecommendationData, setAssistantRecommendationData] = useState<any>(null);
   const [showLegacyTooltip, setShowLegacyTooltip] = useState<boolean>(false);
+  // Tab pending a close confirmation (unsaved changes guard)
+  const [tabPendingClose, setTabPendingClose] = useState<DashboardTab | null>(null);
 
   const handleShowLegacyTooltip = () => {
     setShowLegacyTooltip(true);
@@ -97,13 +99,13 @@ export default function App() {
     // Create a new dashboard tab
     const newDashboardData = {
       id: dashboardId,
-      title: 'New Dashboard',
+      title: 'Untitled dashboard',
       type: 'dashboard' as const,
       data: {
         dashboardType: 'analytics',
         section: 'overview',
         isNew: true,
-        dashboardName: 'Dashboard name',
+        dashboardName: 'Untitled dashboard',
         projectName: 'My project',
         createdAt: new Date().toISOString()
       }
@@ -211,6 +213,20 @@ export default function App() {
     }
   };
 
+  // Ask for confirmation before closing a tab that may have unsaved changes.
+  const handleRequestCloseTab = (tabId: string) => {
+    const tab = openTabs.find(t => t.id === tabId);
+    if (!tab) return;
+    setTabPendingClose(tab);
+  };
+
+  const handleConfirmCloseTab = () => {
+    if (tabPendingClose) {
+      handleCloseTab(tabPendingClose.id);
+    }
+    setTabPendingClose(null);
+  };
+
   const handleCloseTab = (tabId: string) => {
     const updatedTabs = openTabs.filter(tab => tab.id !== tabId);
     setOpenTabs(updatedTabs);
@@ -299,7 +315,7 @@ export default function App() {
               openTabs={openTabs}
               activeTabId={activeTabId}
               onSwitchTab={handleSwitchTab}
-              onCloseTab={handleCloseTab}
+              onCloseTab={handleRequestCloseTab}
               showAnalyticsAssistant={showAnalyticsAssistant}
               onToggleAnalyticsAssistant={setShowAnalyticsAssistant}
               assistantQuery={assistantQuery}
@@ -351,7 +367,7 @@ export default function App() {
               openTabs={openTabs}
               activeTabId={activeTabId}
               onSwitchTab={handleSwitchTab}
-              onCloseTab={handleCloseTab}
+              onCloseTab={handleRequestCloseTab}
               showAnalyticsAssistant={showAnalyticsAssistant}
               onToggleAnalyticsAssistant={setShowAnalyticsAssistant}
               assistantQuery={assistantQuery}
@@ -383,7 +399,7 @@ export default function App() {
               openTabs={openTabs}
               activeTabId={activeTabId}
               onSwitchTab={handleSwitchTab}
-              onCloseTab={handleCloseTab}
+              onCloseTab={handleRequestCloseTab}
               showAnalyticsAssistant={showAnalyticsAssistant}
               onToggleAnalyticsAssistant={setShowAnalyticsAssistant}
               assistantQuery={assistantQuery}
@@ -490,6 +506,29 @@ export default function App() {
           </DialogContent>
         </Dialog>
         
+        {/* Unsaved changes confirmation when closing a dashboard/report tab */}
+        {tabPendingClose && (
+          <Modal onClose={() => setTabPendingClose(null)} restoreFocus>
+            <Modal.Header tag="h2">Close without saving?</Modal.Header>
+            <Modal.Body>
+              You have unsaved changes in “{tabPendingClose.title}”. If you close it now, those changes will be lost.
+            </Modal.Body>
+            <Modal.Footer>
+              <Modal.FooterItem>
+                <FloraButton onClick={() => setTabPendingClose(null)}>
+                  Cancel
+                </FloraButton>
+              </Modal.FooterItem>
+              <Modal.FooterItem>
+                <FloraButton isPrimary isDanger onClick={handleConfirmCloseTab}>
+                  Close without saving
+                </FloraButton>
+              </Modal.FooterItem>
+            </Modal.Footer>
+            <Modal.Close aria-label="Close" />
+          </Modal>
+        )}
+
         <Toaster position="top-right" />
       </div>
     </ErrorBoundary>

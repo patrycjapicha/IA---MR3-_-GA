@@ -8,7 +8,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { HelpCircle, Bell, Settings, LogOut, User, FileText, MessageCircle, Book, Video, Mail, ExternalLink, ChevronRight, Plus, FLORA_PLUS_ICON, Hash, AtSign, AlertTriangle, Download, X, ChevronDown, Paperclip, Maximize2, History, Sparkles, Sparkles as SparkleIcon, Copy, Share, Smile, Users, UserCircle, Share2, BarChart3Stroke, LayoutStroke, DatabaseStroke, FolderStroke, FilterStroke, Send as SendArrowIcon, Zendesk, FLORA_NAV_ICON } from '@/components/icons/flora';
+import { HelpCircle, Bell, Settings, LogOut, User, FileText, MessageCircle, Book, Video, Mail, ExternalLink, ChevronRight, Plus, FLORA_PLUS_ICON, Hash, AtSign, AlertTriangle, Download, X, ChevronDown, Paperclip, Maximize2, History, Sparkles, Sparkles as SparkleIcon, Copy, Share, Smile, Users, UserCircle, Share2, BarChart3Stroke, LayoutStroke, DatabaseStroke, FolderStroke, FilterStroke, Send as SendArrowIcon, Zendesk, FLORA_NAV_ICON, Search } from '@/components/icons/flora';
 import { Input } from './ui/input';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from './ui/drawer';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from './ui/carousel';
@@ -107,6 +107,8 @@ export function TopBar({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAnalyticsMenu, setShowAnalyticsMenu] = useState(false);
   const [selectedView, setSelectedView] = useState('Analytics');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isAssistantExpanded, setIsAssistantExpanded] = useState(false);
   const [showAssistantResponse, setShowAssistantResponse] = useState(false);
   const [copilotTab, setCopilotTab] = useState<'chat' | 'history'>('chat');
@@ -462,19 +464,23 @@ Automate this action with a trigger to reduce manual triage and help improve res
               >
                 Dashboard
               </Item>
-              <Item
-                value="dataset"
-                icon={<DatabaseStroke className={FLORA_MENU_ICON} />}
-              >
-                Dataset
-                <Item.Meta>Create, combine, clean, and prepare datasets for analysis.</Item.Meta>
-              </Item>
+            </ItemGroup>
+            <ItemGroup>
               <Item
                 value="project"
                 icon={<FolderStroke className={FLORA_MENU_ICON} />}
               >
                 Project
                 <Item.Meta>Organize related assets into projects for access management and more.</Item.Meta>
+              </Item>
+            </ItemGroup>
+            <ItemGroup>
+              <Item
+                value="dataset"
+                icon={<DatabaseStroke className={FLORA_MENU_ICON} />}
+              >
+                Dataset
+                <Item.Meta>Create, combine, clean, and prepare datasets for analysis.</Item.Meta>
               </Item>
               <Item
                 value="filter-set"
@@ -490,12 +496,28 @@ Automate this action with a trigger to reduce manual triage and help improve res
         {/* Flora Header.Spacer — pushes actions to the end */}
         <div className="flex-grow min-w-0" aria-hidden="true" />
 
-        {/* Compact search — Flora Header.Search compact input (32px) */}
-        <FloraSearchInput
-          placeholder="Search analytics"
-          aria-label="Search analytics"
-          width={220}
-        />
+        {/* Compact search — collapses to an icon, reveals input on click */}
+        {isSearchOpen ? (
+          <FloraSearchInput
+            placeholder="Search analytics"
+            aria-label="Search analytics"
+            width={220}
+            autoFocus
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onBlur={() => {
+              if (!searchQuery) setIsSearchOpen(false);
+            }}
+          />
+        ) : (
+          <IconButton
+            size="small"
+            onClick={() => setIsSearchOpen(true)}
+            aria-label="Search analytics"
+          >
+            <Search className={FLORA_HEADER_ICON} />
+          </IconButton>
+        )}
 
         {/* Flora Header.Separator — 24px tall, 4px horizontal margin */}
         <hr className="h-[24px] w-px border-0 bg-border shrink-0 mx-[4px]" aria-hidden="true" />
@@ -561,6 +583,9 @@ Automate this action with a trigger to reduce manual triage and help improve res
               </div>
             )}
         </div>
+
+        {/* Flora Header.Separator — right side of Open Explore */}
+        <hr className="h-[24px] w-px border-0 bg-border shrink-0 mx-[4px]" aria-hidden="true" />
 
         <IconButton
           size="small"

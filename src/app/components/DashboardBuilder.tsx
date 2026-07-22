@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Anchor, Button as FloraButton, Checkbox, ChevronButton, Field, IconButton, Item, Menu, Modal, SplitButton, MD, Table, Tag, Tabs, Tooltip as FloraTooltip } from '@zendesk-ui/react-components';
+import { Anchor, Button as FloraButton, Checkbox, ChevronButton, Combobox, ComboboxField, Field, IconButton, Input as FloraInput, Item, Menu, Modal, Option, SplitButton, MD, Table, Tag, Tabs, Textarea as FloraTextarea, Tooltip as FloraTooltip } from '@zendesk-ui/react-components';
 import { FloraSearchInput } from './FloraSearchInput';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { Toggle } from './ui/toggle';
 import { Input } from './ui/input';
+import { Switch } from './ui/switch';
 import { 
   Drawer,
   DrawerContent,
@@ -21,6 +22,7 @@ import {
   BarChart3Stroke as BarChartIcon,
   TextStroke,
   Link,
+  LayoutStroke,
   ImageStroke,
   LineChartStroke,
   PieChartStroke,
@@ -32,6 +34,8 @@ import {
   RedoReturn,
   RefreshCw,
   Redo2,
+  PlayStroke as Play,
+  PauseStroke as Pause,
   ChevronDown,
   MoreVertical,
   DownloadStroke as Download,
@@ -48,10 +52,25 @@ import {
   X,
   TrendingUp,
   Bold,
+  Italic,
+  ExternalLink,
   AlignLeft,
   AlignCenter,
   AlignRight,
   List,
+  SlidersHorizontal,
+  Grid,
+  Sun,
+  TextColor,
+  Eye,
+  Connector,
+  Palette,
+  StopStroke,
+  ShapesStroke,
+  SparklesStroke,
+  PencilSparkleStroke,
+  CheckSquareStroke,
+  Copy,
 } from '@/components/icons/flora';
 import {
   DropdownMenu,
@@ -79,6 +98,7 @@ import {
 } from 'recharts';
 
 const FLORA_ICON = 'size-[16px] shrink-0 text-muted-foreground';
+const FLORA_TOOLBAR_ICON = 'size-[16px] shrink-0 text-muted-foreground';
 const FLORA_LIBRARY_ICON = 'size-[16px] shrink-0 fill-current !text-muted-foreground';
 const FLORA_TABLE_PRIMARY = 'm-0';
 const FLORA_TAB_ADD_ICON = '!size-[16px] shrink-0';
@@ -90,7 +110,7 @@ const FLORA_OUTLINE_BTN = `${FLORA_BTN} border border-[#d8dcde] bg-white hover:b
 const FLORA_ICON_BTN = `${FLORA_BTN} h-8 w-8 p-0 border-0 bg-transparent shadow-none hover:bg-muted/50`;
 const FILTER_MENU_CONTENT_CLASS =
   'z-[200] w-56 overflow-hidden border border-[#e5e5e5] bg-white p-0 shadow-lg max-h-none';
-const FILTER_MENU_SEARCH_CLASS = 'box-border w-full min-w-0 overflow-hidden border-b border-border p-2';
+const FILTER_MENU_SEARCH_CLASS = 'box-border w-full min-w-0 overflow-hidden border-b border-border px-2 pb-2 pt-4';
 const FILTER_MENU_LIST_CLASS =
   'max-h-60 overflow-x-hidden overflow-y-auto py-1 [scrollbar-gutter:stable]';
 const REPORTS_MODAL_LIST_CLASS =
@@ -99,11 +119,330 @@ const REPORTS_MODAL_LIST_CLASS =
 function floraTableHeader(label: string) {
   return <MD tag="span" isBold className={FLORA_TABLE_PRIMARY}>{label}</MD>;
 }
+
+// Flora color palette shared by the widget style menu color pickers
+const FLORA_PALETTE = ['#2f3941', '#1f73b7', '#038153', '#00a2a2', '#5f5cd6', '#6b46c1', '#c72a1c', '#ad5e18', '#68737d', '#d8dcde', '#ffffff', 'transparent'];
+
+// Palette used for text component color, border + background pickers.
+// Laid out on a 6-column grid as three grouped rows:
+//   row 1 — neutrals: white, greys, black  (none/transparent appended when allowed)
+//   row 2 — dark saturated colors together
+//   row 3 — light pastel colors together
+const TEXT_STYLE_PALETTE = [
+  '#FFFFFF', '#F8F9F9', '#E8EAEC', '#5C6970', '#1C2227',
+  '#FCA347', '#B276CD', '#2694D6', '#698CD3', '#26A178', '#EB5C69',
+  '#FED6A9', '#E9D8F1', '#CCE0F1', '#D4DDF0', '#CAE3D9', '#F5D5D8',
+];
+
+// Compact Flora-styled color picker used inside the widget style menu
+function FloraColorPicker({ value, onChange, allowTransparent, palette }: { value: string; onChange: (color: string) => void; allowTransparent?: boolean; palette?: string[] }) {
+  const base = palette ?? FLORA_PALETTE;
+  const withTransparent = allowTransparent && !base.includes('transparent') ? [...base, 'transparent'] : base;
+  const swatches = allowTransparent ? withTransparent : withTransparent.filter(c => c !== 'transparent');
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-6 gap-1.5">
+        {swatches.map((c) => {
+          const isActive = value === c;
+          const isTransparent = c === 'transparent';
+          return (
+            <button
+              key={c}
+              type="button"
+              onClick={() => onChange(c)}
+              aria-label={`Color ${c}`}
+              className={`relative h-6 w-6 rounded-full border transition-transform hover:scale-110 ${isActive ? 'ring-2 ring-[#1f73b7] ring-offset-1' : 'border-[#dcdcda]'} ${isTransparent ? 'bg-white' : ''}`}
+              style={{ backgroundColor: isTransparent ? undefined : c }}
+            >
+              {isTransparent && (
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="h-[1px] w-5 rotate-45 bg-[#c72a1c]" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="h-5 w-5 rounded-[4px] border border-[#dcdcda]" style={{ backgroundColor: value === 'transparent' ? '#fff' : value }} />
+        <Input
+          value={value === 'transparent' ? '' : value}
+          onChange={(e) => onChange(e.target.value || (allowTransparent ? 'transparent' : '#ffffff'))}
+          placeholder="#RRGGBB"
+          className="h-7 flex-1 text-xs"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Inline contextual style controls (background, drop shadow, border) matching the text
+// component toolbar — used by widgets like Image that show a floating toolbar row.
+function WidgetStyleControls({
+  style,
+  onChange,
+  defaultBorderOn = false,
+  onDelete,
+}: {
+  style: any;
+  onChange: (patch: Record<string, any>) => void;
+  defaultBorderOn?: boolean;
+  onDelete?: () => void;
+}) {
+  const sShadow = style?.shadow === true;
+  const sBorder = defaultBorderOn ? style?.border !== false : style?.border === true;
+  const sBorderColor = style?.borderColor || '#e5e7eb';
+  const sBorderWidth = style?.borderWidth ?? 1;
+  const sBg = style?.bgColor || 'transparent';
+  return (
+    <>
+      {/* Component background */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${sBg !== 'transparent' ? 'bg-muted' : 'hover:bg-muted'}`}
+            aria-label="Component background"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="flex h-4 w-4 items-center justify-center rounded-full border border-[#dcdcda]" style={{ backgroundColor: sBg === 'transparent' ? '#ffffff' : sBg }} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
+          <span className="mb-2 block text-xs text-muted-foreground">Background</span>
+          <div onClick={(e) => e.stopPropagation()}>
+            <FloraColorPicker value={sBg} onChange={(c) => onChange({ bgColor: c })} allowTransparent />
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Drop shadow toggle */}
+      <button
+        className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${sShadow ? 'bg-muted' : 'hover:bg-muted'}`}
+        onClick={(e) => { e.stopPropagation(); onChange({ shadow: !sShadow }); }}
+        aria-label="Drop shadow"
+        aria-pressed={sShadow}
+      >
+        <Sun className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+      </button>
+
+      {/* Border */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${sBorder ? 'bg-muted' : 'hover:bg-muted'}`}
+            aria-label="Border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <StopStroke className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56 p-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-muted-foreground">Border</span>
+            <button
+              role="switch"
+              aria-checked={sBorder}
+              aria-label="Toggle border"
+              onClick={(e) => { e.stopPropagation(); onChange({ border: !sBorder }); }}
+              className={`relative h-5 w-9 rounded-full transition-colors ${sBorder ? 'bg-[#1f73b7]' : 'bg-[#dcdcda]'}`}
+            >
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${sBorder ? 'left-[18px]' : 'left-0.5'}`} />
+            </button>
+          </div>
+          <div className={`space-y-3 ${sBorder ? '' : 'opacity-40 pointer-events-none'}`}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-muted-foreground">Weight</span>
+              <div className="flex items-center rounded-[8px] border border-[#dcdcda]" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={sBorderWidth}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) onChange({ border: true, borderWidth: Math.max(1, Math.min(20, n)) });
+                  }}
+                  className="h-7 w-12 rounded-[8px] bg-transparent px-2 text-sm text-foreground [appearance:textfield] focus:outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  aria-label="Border weight in pixels"
+                />
+                <span className="pr-2 text-xs text-muted-foreground">px</span>
+              </div>
+            </div>
+            <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+              <span className="text-xs text-muted-foreground">Border color</span>
+              <FloraColorPicker value={sBorderColor} onChange={(c) => onChange({ border: true, borderColor: c })} palette={TEXT_STYLE_PALETTE} />
+            </div>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Delete component */}
+      {onDelete && (
+        <>
+          <div className="mx-0.5 h-5 w-px bg-[#dcdcda]" />
+          <button
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors hover:bg-[#c72a1c]/10"
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            aria-label="Delete component"
+          >
+            <Trash2 className="size-[16px] shrink-0" style={{ width: 16, height: 16, color: '#c72a1c' }} />
+          </button>
+        </>
+      )}
+    </>
+  );
+}
+
+// Resize affordances drawn around a selected widget:
+//  - four full-length edge strips that sit on the component's stroke, so the
+//    resize cursor is active along the whole active border (not just at points)
+//  - four visible square markers on the corners for diagonal resizing
+// Each calls onResizeStart with the direction it grows from.
+type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+function ResizeHandles({ onResizeStart, horizontalOnly }: { onResizeStart: (e: React.MouseEvent, dir: ResizeDir) => void; horizontalOnly?: boolean }) {
+  // Full-length edge strips (thin, invisible) — the whole stroke is draggable.
+  const allEdges: { dir: ResizeDir; cls: string; cursor: string }[] = [
+    { dir: 'n', cls: '-top-1 left-2 right-2 h-2', cursor: 'cursor-ns-resize' },
+    { dir: 's', cls: '-bottom-1 left-2 right-2 h-2', cursor: 'cursor-ns-resize' },
+    { dir: 'w', cls: '-left-1 top-2 bottom-2 w-2', cursor: 'cursor-ew-resize' },
+    { dir: 'e', cls: '-right-1 top-2 bottom-2 w-2', cursor: 'cursor-ew-resize' },
+  ];
+  // A separator only stretches left/right, so hide the vertical handles + corners.
+  const edges = horizontalOnly ? allEdges.filter(h => h.dir === 'w' || h.dir === 'e') : allEdges;
+  // Corner markers — visible squares.
+  const corners: { dir: ResizeDir; cls: string; cursor: string }[] = horizontalOnly ? [] : [
+    { dir: 'nw', cls: '-top-1 -left-1', cursor: 'cursor-nwse-resize' },
+    { dir: 'ne', cls: '-top-1 -right-1', cursor: 'cursor-nesw-resize' },
+    { dir: 'se', cls: '-bottom-1 -right-1', cursor: 'cursor-nwse-resize' },
+    { dir: 'sw', cls: '-bottom-1 -left-1', cursor: 'cursor-nesw-resize' },
+  ];
+  return (
+    <>
+      {edges.map((h) => (
+        <div
+          key={h.dir}
+          onMouseDown={(e) => onResizeStart(e, h.dir)}
+          className={`absolute z-[110] ${h.cls} ${h.cursor}`}
+          aria-label={`Resize ${h.dir}`}
+        />
+      ))}
+      {horizontalOnly && (['w', 'e'] as ResizeDir[]).map((dir) => (
+        <div
+          key={`marker-${dir}`}
+          onMouseDown={(e) => onResizeStart(e, dir)}
+          className={`absolute top-1/2 -translate-y-1/2 z-[120] h-2.5 w-2.5 rounded-[2px] border border-[#1f73b7] bg-white cursor-ew-resize ${dir === 'w' ? '-left-1' : '-right-1'}`}
+          aria-label={`Resize ${dir}`}
+        />
+      ))}
+      {corners.map((h) => (
+        <div
+          key={h.dir}
+          onMouseDown={(e) => onResizeStart(e, h.dir)}
+          className={`absolute z-[120] h-2.5 w-2.5 rounded-[2px] border border-[#1f73b7] bg-white ${h.cls} ${h.cursor}`}
+          aria-label={`Resize ${h.dir}`}
+        />
+      ))}
+    </>
+  );
+}
+
+// Contextual style menu shared by every dashboard widget: drop shadow, border, background
+function WidgetStyleMenu({ style, onChange, dark }: { style: any; onChange: (patch: Record<string, any>) => void; dark?: boolean }) {
+  const shadow = style?.shadow === true; // default off (no drop shadow)
+  const border = style?.border !== false; // default on (stroke)
+  const borderColor = style?.borderColor || '#e5e7eb';
+  const borderWidth = style?.borderWidth ?? 1;
+  const bgColor = style?.bgColor || '#ffffff';
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        {dark ? (
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-white/10 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Widget style"
+          >
+            <SlidersHorizontal className="size-[16px] shrink-0 text-white" style={{ width: 16, height: 16 }} />
+          </button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Widget style"
+          >
+            <SlidersHorizontal className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+          </Button>
+        )}
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-72 p-4 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drop shadow */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-foreground">Drop shadow</span>
+          <Switch checked={shadow} onCheckedChange={(v) => onChange({ shadow: v })} />
+        </div>
+
+        <Separator />
+
+        {/* Border */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-foreground">Border</span>
+            <Switch checked={border} onCheckedChange={(v) => onChange({ border: v })} />
+          </div>
+          {border && (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">Weight</span>
+                <div className="flex items-center gap-1 rounded-[8px] border border-[#dcdcda] p-0.5">
+                  {[1, 2, 3, 4].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => onChange({ borderWidth: w })}
+                      aria-label={`Border weight ${w}px`}
+                      aria-pressed={borderWidth === w}
+                      className={`flex h-6 w-7 items-center justify-center rounded-[6px] text-xs transition-colors ${
+                        borderWidth === w ? 'bg-[#1f73b7] text-white' : 'text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {w}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-xs text-muted-foreground">Border color</span>
+                <FloraColorPicker value={borderColor} onChange={(c) => onChange({ borderColor: c })} />
+              </div>
+            </>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Background color */}
+        <div className="space-y-1.5">
+          <span className="text-sm text-foreground">Background</span>
+          <FloraColorPicker value={bgColor} onChange={(c) => onChange({ bgColor: c })} allowTransparent />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 const FILTER_ACTIVE_VISIBLE_TAGS = 2;
 const FILTER_ACTIVE_SHELL =
   'inline-flex h-8 w-fit max-w-[360px] items-center gap-1 rounded-[8px] border border-[#dcdcda] bg-white pl-3 pr-2';
 const FILTER_ACTIVE_LABEL =
-  'shrink-0 whitespace-nowrap !text-[12px] !font-normal !leading-4 !text-[#2f3130]';
+  'shrink-0 whitespace-nowrap !text-[12px] !font-semibold !leading-4 !text-[#2f3130]';
+const FILTER_ACTIVE_VALUES =
+  'min-w-0 truncate whitespace-nowrap !text-[12px] !font-normal !leading-4 !text-[#2f3130]';
 const FILTER_ACTIVE_OVERFLOW =
   'shrink-0 whitespace-nowrap !text-[12px] !font-normal !leading-4 !tracking-[-0.0004px] !text-[#406cc4]';
 const FILTER_VALUE_PANEL_CLASS =
@@ -113,11 +452,37 @@ const CANVAS_WIDGET_PADDING = 24;
 
 interface ContentItem {
   id: string;
-  type: 'chart' | 'text' | 'link' | 'image' | 'filter';
+  type: 'chart' | 'text' | 'link' | 'image' | 'filter' | 'separator' | 'section';
   title?: string;
   content?: any;
   position: { x: number; y: number };
   size: { width: number; height: number };
+}
+
+type LinkType = 'asset' | 'hyperlink';
+type LinkState = 'none' | 'filters' | 'cross-filters' | 'all';
+type LinkOpenTarget = 'current' | 'new-tab' | string;
+
+interface LinkFormat {
+  fontStyle: string;
+  fontSize: number;
+  color: string;
+  highlight: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  align: 'left' | 'center' | 'right';
+}
+
+interface LinkContent {
+  label: string;
+  linkType: LinkType;
+  assetId: string | null;
+  assetName: string | null;
+  url: string;
+  openInTab: LinkOpenTarget;
+  passState: LinkState;
+  format: LinkFormat;
 }
 
 interface DashboardTab {
@@ -142,30 +507,67 @@ const toolbarItems = [
   {
     id: 'chart',
     type: 'chart' as const,
-    label: 'Chart',
-    icon: <BarChartIcon className={FLORA_ICON} />,
-    description: 'Add visualization charts'
+    label: 'Report',
+    icon: <BarChartIcon className={FLORA_TOOLBAR_ICON} />,
+    description: 'Add a report'
   },
   {
     id: 'text',
     type: 'text' as const,
     label: 'Text',
-    icon: <TextStroke className={FLORA_ICON} />,
+    icon: <TextStroke className={FLORA_TOOLBAR_ICON} />,
     description: 'Add text content'
-  },
-  {
-    id: 'link',
-    type: 'link' as const,
-    label: 'Link',
-    icon: <Link className={FLORA_ICON} />,
-    description: 'Add hyperlinks'
   },
   {
     id: 'image',
     type: 'image' as const,
     label: 'Image',
-    icon: <ImageStroke className={FLORA_ICON} />,
+    icon: <ImageStroke className={FLORA_TOOLBAR_ICON} />,
     description: 'Add images'
+  },
+  {
+    id: 'elements',
+    type: 'elements' as const,
+    label: 'Elements',
+    icon: <StopStroke className={FLORA_TOOLBAR_ICON} />,
+    description: 'Add a section or separator',
+    isDropdown: true,
+    children: [
+      {
+        id: 'section',
+        type: 'section' as const,
+        label: 'Section',
+        icon: <StopStroke className={FLORA_ICON} />,
+        description: 'Add a section'
+      },
+      {
+        id: 'separator',
+        type: 'separator' as const,
+        label: 'Separator',
+        icon: (
+          <svg className={FLORA_ICON} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        ),
+        description: 'Add a divider line'
+      },
+    ],
+  },
+  {
+    id: 'parameter',
+    type: 'parameter' as const,
+    label: 'Parameter',
+    icon: <ShapesStroke className={FLORA_TOOLBAR_ICON} />,
+    description: 'Coming soon',
+    disabled: true
+  },
+  {
+    id: 'narrative',
+    type: 'narrative' as const,
+    label: 'AI summary',
+    icon: <PencilSparkleStroke className={FLORA_TOOLBAR_ICON} />,
+    description: 'Coming soon',
+    disabled: true
   }
 ];
 
@@ -228,6 +630,121 @@ const mockReports = [
   { id: 'report-17', name: 'Automation Impact Summary', type: 'Analytics', lastUpdated: '2023-12-30', owner: 'John Smith', projectName: 'Support Operations', tags: [{ label: 'Analytics' }, { label: 'Automation' }] },
   { id: 'report-18', name: 'Agent Utilization Report', type: 'Performance', lastUpdated: '2023-12-29', owner: 'Sarah Chen', projectName: 'Real-time Monitoring', tags: [{ label: 'Performance' }, { label: 'Utilization' }] },
 ];
+
+// Dashboards a link can point to. Each carries its own tabs so a link can
+// deep-link into a specific tab of the destination dashboard.
+const mockDashboards = [
+  {
+    id: 'dashboard-1',
+    name: 'Executive Overview',
+    lastUpdated: '2024-01-15',
+    owner: 'John Smith',
+    projectName: 'Customer Experience Hub',
+    tabs: [
+      { id: 'dash-1-tab-1', name: 'Summary' },
+      { id: 'dash-1-tab-2', name: 'Trends' },
+      { id: 'dash-1-tab-3', name: 'Regions' },
+    ],
+  },
+  {
+    id: 'dashboard-2',
+    name: 'Support Operations',
+    lastUpdated: '2024-01-13',
+    owner: 'Sarah Chen',
+    projectName: 'Support Operations',
+    tabs: [
+      { id: 'dash-2-tab-1', name: 'Queues' },
+      { id: 'dash-2-tab-2', name: 'Agents' },
+    ],
+  },
+  {
+    id: 'dashboard-3',
+    name: 'Real-time Monitoring',
+    lastUpdated: '2024-01-11',
+    owner: 'Michael Park',
+    projectName: 'Real-time Monitoring',
+    tabs: [
+      { id: 'dash-3-tab-1', name: 'Live' },
+      { id: 'dash-3-tab-2', name: 'SLA' },
+      { id: 'dash-3-tab-3', name: 'Alerts' },
+    ],
+  },
+  {
+    id: 'dashboard-4',
+    name: 'Customer Satisfaction',
+    lastUpdated: '2024-01-08',
+    owner: 'Emily Rodriguez',
+    projectName: 'Customer Experience Hub',
+    tabs: [
+      { id: 'dash-4-tab-1', name: 'CSAT' },
+      { id: 'dash-4-tab-2', name: 'CES' },
+    ],
+  },
+];
+
+// ---- Text-widget link ----
+// A link attached to text: either an internal asset (report or dashboard,
+// with an optional destination tab for dashboards) or an external hyperlink.
+type TextLinkAssetKind = 'report' | 'dashboard';
+
+interface TextLink {
+  linkType: LinkType; // 'asset' | 'hyperlink'
+  assetKind: TextLinkAssetKind | null;
+  assetId: string | null;
+  assetName: string | null;
+  tabId: string | null;
+  tabName: string | null;
+  url: string;
+  passState: LinkState; // state carried through an asset link
+}
+
+function createDefaultTextLink(): TextLink {
+  return {
+    linkType: 'asset',
+    assetKind: null,
+    assetId: null,
+    assetName: null,
+    tabId: null,
+    tabName: null,
+    url: '',
+    passState: 'none',
+  };
+}
+
+// ---- Link widget ----
+// State that a link can carry through to its destination
+const LINK_STATE_OPTIONS: { value: LinkState; label: string; description: string }[] = [
+  { value: 'none', label: 'None', description: "Don't pass any state" },
+  { value: 'filters', label: 'Filters', description: 'Pass the current dashboard filters' },
+  { value: 'cross-filters', label: 'Cross-filters', description: 'Pass interactive cross-filter selections' },
+  { value: 'all', label: 'All', description: 'Pass filters and cross-filters' },
+];
+
+const LINK_FONT_STYLES = ['Default', 'Inter', 'Georgia', 'Courier New', 'Arial'];
+const LINK_FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
+
+// Default content for a freshly created link widget
+function createDefaultLinkContent(): LinkContent {
+  return {
+    label: '',
+    linkType: 'asset',
+    assetId: null,
+    assetName: null,
+    url: '',
+    openInTab: 'current',
+    passState: 'none',
+    format: {
+      fontStyle: 'Default',
+      fontSize: 16,
+      color: '#1f73b7',
+      highlight: 'transparent',
+      bold: false,
+      italic: false,
+      underline: true,
+      align: 'left',
+    },
+  };
+}
 
 const filterOptions = [
   {
@@ -434,16 +951,18 @@ function AddFilterMenu({
         if (!nextOpen) setSearch('');
       }}
     >
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 w-8 shrink-0 p-0 hover:bg-muted ${FLORA_BTN}`}
-          aria-label="Add filter"
-        >
-          {filterIcon}
-        </Button>
-      </DropdownMenuTrigger>
+      <FloraTooltip content="Add filter" placement="bottom" size="small">
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 w-8 shrink-0 p-0 hover:bg-muted ${FLORA_BTN}`}
+            aria-label="Add filter"
+          >
+            {filterIcon}
+          </Button>
+        </DropdownMenuTrigger>
+      </FloraTooltip>
       <DropdownMenuContent align="start" className={FILTER_MENU_CONTENT_CLASS}>
         <div
           className={FILTER_MENU_SEARCH_CLASS}
@@ -543,13 +1062,13 @@ function SelectReportModal({
                     <Table.Cell isTruncated>
                       <div className="flex min-w-0 items-center gap-[8px]">
                         <BarChartIcon className={FLORA_LIBRARY_ICON} />
-                        <MD tag="span" className={FLORA_TABLE_PRIMARY}>{report.name}</MD>
+                        <MD tag="span" className={`${FLORA_TABLE_PRIMARY} block min-w-0 truncate`}>{report.name}</MD>
                       </div>
                     </Table.Cell>
                     <Table.Cell isTruncated>
-                      <div className="flex min-w-0 items-center gap-[6px] whitespace-nowrap">
+                      <div className="flex min-w-0 items-center gap-[6px]">
                         <Folder className={FLORA_LIBRARY_ICON} />
-                        <MD tag="span" className={FLORA_TABLE_PRIMARY}>{report.projectName}</MD>
+                        <MD tag="span" className={`${FLORA_TABLE_PRIMARY} block min-w-0 truncate`}>{report.projectName}</MD>
                       </div>
                     </Table.Cell>
                     <Table.Cell>
@@ -573,6 +1092,601 @@ function SelectReportModal({
       </Modal.Body>
       <Modal.Close aria-label="Close" />
     </Modal>
+  );
+}
+
+// Compact Flora combobox used as a plain single-select dropdown.
+function FloraSelectField({
+  label,
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  label?: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <ComboboxField>
+      {label ? (
+        <ComboboxField.Label className="text-sm font-medium text-foreground">{label}</ComboboxField.Label>
+      ) : (
+        <ComboboxField.Label hidden>{ariaLabel || label || 'Select'}</ComboboxField.Label>
+      )}
+      <Combobox
+        isCompact
+        isEditable={false}
+        selectionValue={value}
+        listboxAriaLabel={ariaLabel || label || 'Select'}
+        onChange={(changes) => {
+          if (changes.selectionValue !== undefined) {
+            const next = Array.isArray(changes.selectionValue)
+              ? changes.selectionValue[0]
+              : changes.selectionValue;
+            if (typeof next === 'string') onChange(next);
+          }
+        }}
+      >
+        {options.map((o) => (
+          <Option key={o.value} value={o.value} label={o.label} isSelected={o.value === value}>
+            {o.label}
+          </Option>
+        ))}
+      </Combobox>
+    </ComboboxField>
+  );
+}
+
+// Contextual link editor for the Text widget, shown as a popover next to the
+// floating text toolbar (not a modal). Lets the user attach either an internal
+// asset (a report, or a dashboard with a destination tab) or an external
+// hyperlink. Link type and dashboard tab are chosen with select dropdowns.
+function TextLinkEditor({
+  initialLink,
+  onSave,
+  onRemove,
+}: {
+  initialLink: TextLink | null;
+  onSave: (link: TextLink) => void;
+  onRemove: () => void;
+}) {
+  const [form, setForm] = useState<TextLink>(initialLink || createDefaultTextLink());
+  const [search, setSearch] = useState('');
+
+  const normalizedSearch = search.trim().toLowerCase();
+
+  // Combined, searchable list of dashboards and reports.
+  const assetResults = [
+    ...mockDashboards.map((d) => ({
+      kind: 'dashboard' as TextLinkAssetKind,
+      id: d.id,
+      name: d.name,
+      projectName: d.projectName,
+      tabs: d.tabs,
+    })),
+    ...mockReports.map((r) => ({
+      kind: 'report' as TextLinkAssetKind,
+      id: r.id,
+      name: r.name,
+      projectName: r.projectName,
+      tabs: undefined as { id: string; name: string }[] | undefined,
+    })),
+  ].filter((a) =>
+    !normalizedSearch ||
+    a.name.toLowerCase().includes(normalizedSearch) ||
+    a.projectName.toLowerCase().includes(normalizedSearch),
+  );
+
+  const selectedDashboard =
+    form.assetKind === 'dashboard' && form.assetId
+      ? mockDashboards.find((d) => d.id === form.assetId) || null
+      : null;
+
+  const destinationValid =
+    form.linkType === 'hyperlink' ? form.url.trim().length > 0 : !!form.assetId;
+  const canSave = destinationValid;
+
+  const listRowBase =
+    'flex w-full items-center justify-between gap-2 rounded-[6px] border px-3 py-2 text-left text-sm transition-colors';
+
+  const selectAsset = (asset: {
+    kind: TextLinkAssetKind;
+    id: string;
+    name: string;
+    tabs?: { id: string; name: string }[];
+  }) =>
+    setForm((prev) => ({
+      ...prev,
+      assetKind: asset.kind,
+      assetId: asset.id,
+      assetName: asset.name,
+      // Dashboards default to their first tab; reports carry no tab.
+      tabId: asset.kind === 'dashboard' ? asset.tabs?.[0]?.id ?? null : null,
+      tabName: asset.kind === 'dashboard' ? asset.tabs?.[0]?.name ?? null : null,
+    }));
+
+  return (
+    <div className="space-y-3" onKeyDown={(e) => e.stopPropagation()}>
+      {/* Link type — select */}
+      <FloraSelectField
+        label="Link to"
+        ariaLabel="Link type"
+        value={form.linkType}
+        options={[
+          { value: 'asset', label: 'Asset' },
+          { value: 'hyperlink', label: 'URL' },
+        ]}
+        onChange={(value) => setForm((prev) => ({ ...prev, linkType: value as LinkType }))}
+      />
+
+      {form.linkType === 'asset' ? (
+        <>
+          {/* Single search across dashboards and reports */}
+          <FloraSearchInput
+            placeholder="Search dashboards and reports"
+            aria-label="Search dashboards and reports"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            width="100%"
+          />
+
+          <div className="max-h-[220px] overflow-y-auto rounded-[8px] border border-[#dcdcda] p-1.5 space-y-1 [scrollbar-gutter:stable]">
+            {assetResults.length === 0 ? (
+              <div className="px-3 py-4 text-center text-sm text-muted-foreground">No assets found</div>
+            ) : (
+              assetResults.map((a) => {
+                const active = form.assetId === a.id;
+                return (
+                  <button
+                    key={`${a.kind}-${a.id}`}
+                    type="button"
+                    onClick={() => selectAsset(a)}
+                    className={`${listRowBase} ${
+                      active ? 'border-[#1f73b7] bg-[#1f73b7]/5' : 'border-transparent hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      {a.kind === 'dashboard' ? (
+                        <LayoutStroke className={FLORA_ICON} />
+                      ) : (
+                        <BarChartIcon className={FLORA_ICON} />
+                      )}
+                      <span className="block truncate text-foreground">{a.name}</span>
+                    </span>
+                    {active && <Check className={FLORA_ICON} />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+
+          {/* Destination tab — select (only for dashboards) */}
+          {selectedDashboard && (
+            <FloraSelectField
+              label="Destination tab"
+              ariaLabel="Destination tab"
+              value={form.tabId ?? ''}
+              options={selectedDashboard.tabs.map((t) => ({ value: t.id, label: t.name }))}
+              onChange={(value) => {
+                const tab = selectedDashboard.tabs.find((t) => t.id === value);
+                setForm((prev) => ({ ...prev, tabId: tab?.id ?? null, tabName: tab?.name ?? null }));
+              }}
+            />
+          )}
+
+          {/* Filter state passthrough — select (once an asset is chosen) */}
+          {form.assetId && (
+            <FloraSelectField
+              label="Filter state"
+              ariaLabel="Filter state"
+              value={form.passState}
+              options={LINK_STATE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, passState: value as LinkState }))}
+            />
+          )}
+        </>
+      ) : (
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium text-foreground">URL</span>
+          <Input
+            value={form.url}
+            onChange={(e) => setForm({ ...form, url: e.target.value })}
+            placeholder="https://example.com"
+            onKeyDown={(e) => e.stopPropagation()}
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-1">
+        {initialLink ? (
+          <FloraButton isPill={false} size="small" isDanger onClick={onRemove}>
+            Remove
+          </FloraButton>
+        ) : (
+          <span />
+        )}
+        <FloraButton
+          isPrimary
+          isPill={false}
+          size="small"
+          disabled={!canSave}
+          onClick={() => onSave(form)}
+        >
+          {initialLink ? 'Save' : 'Add link'}
+        </FloraButton>
+      </div>
+    </div>
+  );
+}
+
+// Configuration modal for the Link widget: label, link type (asset / hyperlink),
+// destination, tab target, state passthrough, and full text formatting.
+function LinkConfigModal({
+  initialContent,
+  tabs,
+  onClose,
+  onSave,
+}: {
+  initialContent: LinkContent;
+  tabs: { id: string; name: string }[];
+  onClose: () => void;
+  onSave: (content: LinkContent) => void;
+}) {
+  const [form, setForm] = useState<LinkContent>(initialContent);
+  const [showAssetPicker, setShowAssetPicker] = useState(false);
+
+  const setFormat = (patch: Partial<LinkFormat>) =>
+    setForm((prev) => ({ ...prev, format: { ...prev.format, ...patch } }));
+
+  const clampSize = (n: number) => Math.max(8, Math.min(96, Math.round(n)));
+
+  const destinationValid =
+    form.linkType === 'asset' ? !!form.assetId : form.url.trim().length > 0;
+  const canSave = form.label.trim().length > 0 && destinationValid;
+
+  const previewText = form.label.trim() || 'Link text';
+  const previewStyle: React.CSSProperties = {
+    fontFamily: form.format.fontStyle === 'Default' ? undefined : form.format.fontStyle,
+    fontSize: `${form.format.fontSize}px`,
+    color: form.format.color,
+    backgroundColor:
+      form.format.highlight && form.format.highlight !== 'transparent'
+        ? form.format.highlight
+        : undefined,
+    fontWeight: form.format.bold ? 700 : 400,
+    fontStyle: form.format.italic ? 'italic' : 'normal',
+    textDecoration: form.format.underline ? 'underline' : 'none',
+    textAlign: form.format.align,
+  };
+
+  const fmtBtn = (active: boolean) =>
+    `flex h-8 w-8 items-center justify-center rounded-[6px] border transition-colors ${
+      active
+        ? 'border-[#1f73b7] bg-[#1f73b7]/10 text-[#1f73b7]'
+        : 'border-[#dcdcda] bg-white text-foreground hover:bg-muted'
+    }`;
+
+  const alignIconFor = (a: 'left' | 'center' | 'right') =>
+    a === 'center' ? (
+      <AlignCenter className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+    ) : a === 'right' ? (
+      <AlignRight className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+    ) : (
+      <AlignLeft className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+    );
+
+  return (
+    <>
+      <Modal onClose={onClose} restoreFocus>
+        <Modal.Header tag="h2">Add link</Modal.Header>
+        <Modal.Body>
+          <div className="space-y-5 py-1">
+            {/* Label */}
+            <div className="space-y-1.5">
+              <label htmlFor="link-label" className="text-sm font-medium text-foreground">
+                Label
+              </label>
+              <Input
+                id="link-label"
+                value={form.label}
+                onChange={(e) => setForm({ ...form, label: e.target.value })}
+                placeholder="e.g., View full report"
+                onKeyDown={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            </div>
+
+            {/* Link type */}
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-foreground">Link type</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, linkType: 'asset' })}
+                  className={`flex flex-col items-start gap-0.5 rounded-[8px] border p-3 text-left transition-colors ${
+                    form.linkType === 'asset'
+                      ? 'border-[#1f73b7] bg-[#1f73b7]/5'
+                      : 'border-[#dcdcda] hover:bg-muted/40'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <BarChartIcon className={FLORA_ICON} /> Asset
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Link to an internal dashboard or report
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, linkType: 'hyperlink' })}
+                  className={`flex flex-col items-start gap-0.5 rounded-[8px] border p-3 text-left transition-colors ${
+                    form.linkType === 'hyperlink'
+                      ? 'border-[#1f73b7] bg-[#1f73b7]/5'
+                      : 'border-[#dcdcda] hover:bg-muted/40'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <ExternalLink className={FLORA_ICON} /> URL
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Link to an external URL
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Destination */}
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-foreground">
+                {form.linkType === 'asset' ? 'Destination asset' : 'URL'}
+              </span>
+              {form.linkType === 'asset' ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAssetPicker(true)}
+                  className="flex h-9 w-full items-center justify-between rounded-[6px] border border-[#dcdcda] bg-white px-3 text-left text-sm hover:bg-muted/40 transition-colors"
+                >
+                  <span className={form.assetName ? 'text-foreground' : 'text-muted-foreground'}>
+                    {form.assetName || 'Select a report or dashboard'}
+                  </span>
+                  <ChevronDown className={FLORA_ICON} />
+                </button>
+              ) : (
+                <Input
+                  value={form.url}
+                  onChange={(e) => setForm({ ...form, url: e.target.value })}
+                  placeholder="https://example.com"
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              )}
+            </div>
+
+            {/* Open in tab (optional) */}
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-foreground">
+                Open in <span className="font-normal text-muted-foreground">(optional)</span>
+              </span>
+              <div className="relative">
+                <select
+                  value={form.openInTab}
+                  onChange={(e) => setForm({ ...form, openInTab: e.target.value })}
+                  className="h-9 w-full appearance-none rounded-[6px] border border-[#dcdcda] bg-white px-3 pr-9 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#1f73b7]"
+                >
+                  <option value="current">Current tab</option>
+                  <option value="new-tab">New browser tab</option>
+                  {tabs.length > 0 && (
+                    <optgroup label="Dashboard tabs">
+                      {tabs.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+                <ChevronDown
+                  className={`${FLORA_ICON} pointer-events-none absolute right-3 top-1/2 -translate-y-1/2`}
+                />
+              </div>
+            </div>
+
+            {/* State passthrough */}
+            <div className="space-y-1.5">
+              <span className="text-sm font-medium text-foreground">Pass state through link</span>
+              <div className="grid grid-cols-2 gap-2">
+                {LINK_STATE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, passState: opt.value })}
+                    className={`flex items-start gap-2 rounded-[8px] border p-2.5 text-left transition-colors ${
+                      form.passState === opt.value
+                        ? 'border-[#1f73b7] bg-[#1f73b7]/5'
+                        : 'border-[#dcdcda] hover:bg-muted/40'
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                        form.passState === opt.value ? 'border-[#1f73b7]' : 'border-[#c2c8cc]'
+                      }`}
+                    >
+                      {form.passState === opt.value && (
+                        <span className="h-2 w-2 rounded-full bg-[#1f73b7]" />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm text-foreground">{opt.label}</span>
+                      <span className="block text-xs text-muted-foreground">{opt.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Text formatting */}
+            <div className="space-y-2.5">
+              <span className="text-sm font-medium text-foreground">Text formatting</span>
+
+              {/* Font style + size row */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <select
+                    value={form.format.fontStyle}
+                    onChange={(e) => setFormat({ fontStyle: e.target.value })}
+                    aria-label="Font style"
+                    className="h-8 w-full appearance-none rounded-[6px] border border-[#dcdcda] bg-white px-2.5 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#1f73b7]"
+                  >
+                    {LINK_FONT_STYLES.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className={`${FLORA_ICON} pointer-events-none absolute right-2 top-1/2 -translate-y-1/2`} />
+                </div>
+                <div className="relative w-24">
+                  <select
+                    value={form.format.fontSize}
+                    onChange={(e) => setFormat({ fontSize: clampSize(parseInt(e.target.value, 10)) })}
+                    aria-label="Font size"
+                    className="h-8 w-full appearance-none rounded-[6px] border border-[#dcdcda] bg-white px-2.5 pr-8 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-[#1f73b7]"
+                  >
+                    {LINK_FONT_SIZES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}px
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className={`${FLORA_ICON} pointer-events-none absolute right-2 top-1/2 -translate-y-1/2`} />
+                </div>
+              </div>
+
+              {/* Style toggles + alignment */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  className={fmtBtn(form.format.bold)}
+                  onClick={() => setFormat({ bold: !form.format.bold })}
+                  aria-label="Bold"
+                  aria-pressed={form.format.bold}
+                >
+                  <Bold className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+                </button>
+                <button
+                  type="button"
+                  className={fmtBtn(form.format.italic)}
+                  onClick={() => setFormat({ italic: !form.format.italic })}
+                  aria-label="Italic"
+                  aria-pressed={form.format.italic}
+                >
+                  <Italic className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+                </button>
+                <button
+                  type="button"
+                  className={`${fmtBtn(form.format.underline)} underline`}
+                  onClick={() => setFormat({ underline: !form.format.underline })}
+                  aria-label="Underline"
+                  aria-pressed={form.format.underline}
+                >
+                  <span className="text-sm font-medium leading-none">U</span>
+                </button>
+
+                <div className="mx-0.5 h-6 w-px bg-[#dcdcda]" />
+
+                {(['left', 'center', 'right'] as const).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    className={fmtBtn(form.format.align === a)}
+                    onClick={() => setFormat({ align: a })}
+                    aria-label={`Align ${a}`}
+                    aria-pressed={form.format.align === a}
+                  >
+                    {alignIconFor(a)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Color + highlight */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">Text color</span>
+                  <FloraColorPicker
+                    value={form.format.color}
+                    onChange={(c) => setFormat({ color: c })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-xs text-muted-foreground">Highlight</span>
+                  <FloraColorPicker
+                    value={form.format.highlight}
+                    onChange={(c) => setFormat({ highlight: c })}
+                    allowTransparent
+                  />
+                </div>
+              </div>
+
+              {/* Live preview */}
+              <div className="space-y-1.5">
+                <span className="text-xs text-muted-foreground">Preview</span>
+                <div className="rounded-[8px] border border-[#dcdcda] bg-[#fafafa] px-3 py-3">
+                  <div style={{ textAlign: form.format.align }}>
+                    <span
+                      className="inline-flex items-center gap-1 rounded-[3px] px-0.5 cursor-pointer"
+                      style={previewStyle}
+                    >
+                      {form.linkType === 'hyperlink' && (
+                        <ExternalLink style={{ width: form.format.fontSize * 0.8, height: form.format.fontSize * 0.8 }} />
+                      )}
+                      {previewText}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Modal.FooterItem>
+            <FloraButton onClick={onClose}>
+              Cancel
+            </FloraButton>
+          </Modal.FooterItem>
+          <Modal.FooterItem>
+            <FloraButton
+              isPrimary
+              disabled={!canSave}
+              onClick={() => onSave(form)}
+            >
+              Add link
+            </FloraButton>
+          </Modal.FooterItem>
+        </Modal.Footer>
+        <Modal.Close aria-label="Close" />
+      </Modal>
+
+      {showAssetPicker && (
+        <SelectReportModal
+          onClose={() => setShowAssetPicker(false)}
+          onSelect={(reportId) => {
+            const report = mockReports.find((r) => r.id === reportId);
+            setForm((prev) => ({
+              ...prev,
+              assetId: reportId,
+              assetName: report?.name || null,
+            }));
+            setShowAssetPicker(false);
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -797,11 +1911,11 @@ function DashboardActiveFilter({
       <MD tag="span" className={FILTER_ACTIVE_LABEL}>
         {filter.label}
       </MD>
-      {visibleTags.map((value) => (
-        <Tag key={value} size="small" className="dashboard-active-filter-tag shrink-0">
-          {value}
-        </Tag>
-      ))}
+      {visibleTags.length > 0 && (
+        <MD tag="span" className={FILTER_ACTIVE_VALUES}>
+          {visibleTags.join(', ')}
+        </MD>
+      )}
       {overflowCount > 0 && (
         <FloraTooltip content={overflowValues.join(', ')} placement="bottom" size="small">
           <span className="inline-flex shrink-0">
@@ -993,22 +2107,46 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [dragOverImageId, setDragOverImageId] = useState<string | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [linkPopoverTextId, setLinkPopoverTextId] = useState<string | null>(null);
-  const [linkDraft, setLinkDraft] = useState<string>('');
+  // Id of the text item whose link picker (TextLinkModal) is open, if any
+  const [textLinkModalItemId, setTextLinkModalItemId] = useState<string | null>(null);
+  const [resizingItemId, setResizingItemId] = useState<string | null>(null);
+  // Id of the currently selected/active widget. Its contextual toolbar and
+  // resize handles are only shown once it is clicked.
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(true);
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(true);
   const [showChartModal, setShowChartModal] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(dashboardTitle || initialData?.dashboardName || 'Dashboard name');
+  const [editedTitle, setEditedTitle] = useState(dashboardTitle || initialData?.dashboardName || 'Untitled dashboard');
   const displayProjectName = projectName || initialData?.projectName || 'My project';
   const displaySubprojectName = initialData?.subprojectName || 'Subproject';
-  const [activeFilters, setActiveFilters] = useState<Array<{ id: string; label: string; value: string; typeId: string }>>([]);
+  // Every dashboard (new or opened) starts with a Last 30 days date filter
+  const [activeFilters, setActiveFilters] = useState<Array<{ id: string; label: string; value: string; typeId: string }>>([
+    { id: 'filter-default-date-range', label: 'Date Range', value: 'Last 30 days', typeId: 'date-range' },
+  ]);
+  const [showEventFilter, setShowEventFilter] = useState(true);
   const [activeBookmarkId, setActiveBookmarkId] = useState<string | null>(null);
   const [isBookmarkModified, setIsBookmarkModified] = useState(false);
   const [showSaveBookmarkModal, setShowSaveBookmarkModal] = useState(false);
   const [bookmarkName, setBookmarkName] = useState('');
   const [isSavingAsNew, setIsSavingAsNew] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+
+  // Save dashboard modal (name / description / url / project)
+  const [showSaveDashboardModal, setShowSaveDashboardModal] = useState(false);
+  const [saveForm, setSaveForm] = useState({ name: '', description: '', url: '', projectId: '' });
+  const [projectList, setProjectList] = useState<{ id: string; name: string }[]>([
+    { id: 'proj-my-project', name: 'My project' },
+    { id: 'proj-sales', name: 'Sales analytics' },
+    { id: 'proj-support', name: 'Support insights' },
+  ]);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+
+  // Link widget configuration modal
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkModalItemId, setLinkModalItemId] = useState<string | null>(null);
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
   const contentItems = activeTab?.contentItems || [];
@@ -1150,10 +2288,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         position: getNextPosition({ width: 320, height: 220 }),
         size: { width: 320, height: 220 },
         title: 'Image',
-        content: { imageUrl: null }
+        content: { imageUrl: null, style: { shadow: false, border: true, bgColor: '#ffffff' } }
       };
       setContentItems([...contentItems, newItem]);
       setSelectedTool(null);
+      setSelectedItemId(newItem.id);
     } else if (toolId === 'text') {
       // Drop an editable text box next to the last element, ready to type
       const id = `text-${Date.now()}`;
@@ -1162,14 +2301,56 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         type: 'text',
         position: getNextPosition({ width: 260, height: 64 }),
         size: { width: 260, height: 64 },
-        content: { text: '', align: 'left', bold: false, link: null }
+        content: { text: '', align: 'left', bold: false, link: null, style: { shadow: false, border: true, bgColor: '#ffffff' } }
       };
       setContentItems([...contentItems, newItem]);
       setSelectedTool(null);
+      setSelectedItemId(id);
       setEditingTextId(id);
+    } else if (toolId === 'separator') {
+      // Drop a horizontal divider line onto the canvas
+      const id = `separator-${Date.now()}`;
+      const newItem: ContentItem = {
+        id,
+        type: 'separator',
+        position: getNextPosition({ width: 320, height: 24 }),
+        size: { width: 320, height: 24 },
+        content: { style: { borderWidth: 2, borderColor: '#5C6970' } }
+      };
+      setContentItems([...contentItems, newItem]);
+      setSelectedTool(null);
+      setSelectedItemId(id);
+    } else if (toolId === 'section') {
+      // Drop a blank rectangle: white background + stroke by default
+      const id = `section-${Date.now()}`;
+      const newItem: ContentItem = {
+        id,
+        type: 'section',
+        position: getNextPosition({ width: 400, height: 240 }),
+        size: { width: 400, height: 240 },
+        content: { style: { shadow: false, border: true, borderColor: '#D8DCDE', borderWidth: 1, bgColor: '#FFFFFF' } }
+      };
+      setContentItems([...contentItems, newItem]);
+      setSelectedTool(null);
+      setSelectedItemId(id);
     } else {
       setSelectedTool(toolId === selectedTool ? null : toolId);
     }
+  };
+
+  // Save / update / remove a link on a text item
+  const handleSaveTextLink = (link: TextLink) => {
+    if (textLinkModalItemId) {
+      handleUpdateTextContent(textLinkModalItemId, { link });
+    }
+    setTextLinkModalItemId(null);
+  };
+
+  const handleRemoveTextLink = () => {
+    if (textLinkModalItemId) {
+      handleUpdateTextContent(textLinkModalItemId, { link: null });
+    }
+    setTextLinkModalItemId(null);
   };
 
   const handleUpdateTextContent = (itemId: string, patch: Record<string, any>) => {
@@ -1178,6 +2359,103 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         i.id === itemId ? { ...i, content: { ...i.content, ...patch } } : i
       )
     );
+  };
+
+  // Save the configured link back onto its widget, or drop the widget if the
+  // modal is dismissed before a brand-new link was ever completed.
+  const handleSaveLink = (content: LinkContent) => {
+    if (linkModalItemId) {
+      setContentItems(items =>
+        items.map(i => (i.id === linkModalItemId ? { ...i, content } : i))
+      );
+    }
+    setShowLinkModal(false);
+    setLinkModalItemId(null);
+  };
+
+  const handleCloseLinkModal = () => {
+    // Discard an empty, never-configured link widget on cancel
+    if (linkModalItemId) {
+      setContentItems(items =>
+        items.filter(i => !(i.id === linkModalItemId && i.type === 'link' && !i.content?.label?.trim()))
+      );
+    }
+    setShowLinkModal(false);
+    setLinkModalItemId(null);
+  };
+
+  const handleEditLink = (itemId: string) => {
+    setLinkModalItemId(itemId);
+    setShowLinkModal(true);
+  };
+
+  // Pointer-based resize from any of the 8 handles (corners + edges).
+  // `dir` encodes which edges move: n/s adjust top/height, w/e adjust left/width.
+  const handleResizeStart = (
+    e: React.MouseEvent,
+    item: ContentItem,
+    dir: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw',
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizingItemId(item.id);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = item.size.width;
+    const startH = item.size.height || 64;
+    const startLeft = item.position.x;
+    const startTop = item.position.y;
+    const MIN_W = 120;
+    const MIN_H = item.type === 'separator' ? 24 : item.type === 'text' ? 40 : 100;
+
+    const hasN = dir.includes('n');
+    const hasS = dir.includes('s');
+    const hasW = dir.includes('w');
+    const hasE = dir.includes('e');
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+
+      let newW = startW;
+      let newH = startH;
+      let newLeft = startLeft;
+      let newTop = startTop;
+
+      if (hasE) {
+        newW = Math.max(MIN_W, startW + dx);
+      } else if (hasW) {
+        newW = Math.max(MIN_W, startW - dx);
+        newLeft = startLeft + (startW - newW);
+      }
+
+      if (hasS) {
+        newH = Math.max(MIN_H, startH + dy);
+      } else if (hasN) {
+        newH = Math.max(MIN_H, startH - dy);
+        newTop = startTop + (startH - newH);
+      }
+
+      setContentItems(items =>
+        items.map(i =>
+          i.id === item.id
+            ? {
+                ...i,
+                position: { x: newLeft, y: newTop },
+                size: { width: newW, height: newH },
+                content: { ...i.content, style: { ...(i.content?.style || {}), resized: true } },
+              }
+            : i
+        )
+      );
+    };
+    const onUp = () => {
+      setResizingItemId(null);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   };
 
   // Read a selected/dropped file into a data URL and store it on the image item
@@ -1231,6 +2509,13 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     }
   };
 
+  const handleResetFilters = () => {
+    setActiveFilters([]);
+    if (activeBookmarkId) {
+      setIsBookmarkModified(true);
+    }
+  };
+
   const handleApplySavedView = (viewId: string) => {
     const view = savedFilteredViews.find(v => v.id === viewId);
     if (view) {
@@ -1238,6 +2523,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       setActiveBookmarkId(viewId);
       setIsBookmarkModified(false);
     }
+  };
+
+  // Deselect any active saved view (return to no view / empty selection)
+  const handleClearSavedView = () => {
+    setActiveBookmarkId(null);
+    setIsBookmarkModified(false);
   };
 
   const handleDeleteBookmark = (viewId: string, e: React.MouseEvent) => {
@@ -1300,7 +2591,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       position: getNextPosition({ width: 350, height: 250 }),
       size: { width: 350, height: 250 },
       title: `${selectedReport?.name} - Resolution Time KPI`,
-      content: { 
+      content: {
         chartType: 'kpi-resolution-time',
         reportSource: selectedReport?.name,
         reportType: selectedReport?.type,
@@ -1308,11 +2599,14 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           averageResolutionTime: '2.3 hours',
           trend: '+12%',
           lastUpdated: selectedReport?.lastUpdated
-        }
+        },
+        // Reports default to a stroke/border with no drop shadow
+        style: { shadow: false, border: true }
       }
     };
 
     setContentItems([...contentItems, newItem]);
+    setSelectedItemId(newItem.id);
   };
 
   const handleChartSelect = (chartType: string) => {
@@ -1326,7 +2620,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       position: getNextPosition({ width: 300, height: 200 }),
       size: { width: 300, height: 200 },
       title: chartTypes.find(c => c.id === chartType)?.name || 'Chart',
-      content: { chartType }
+      content: { chartType, style: { shadow: false, border: true } }
     };
 
     setContentItems([...contentItems, newItem]);
@@ -1334,9 +2628,9 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Clicking empty canvas deselects any active text editor
+    // Clicking empty canvas deselects any active text editor / selected widget
     if (editingTextId) setEditingTextId(null);
-    if (linkPopoverTextId) setLinkPopoverTextId(null);
+    setSelectedItemId(null);
     if (!selectedTool) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -1356,17 +2650,48 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     setSelectedTool(null);
   };
 
-  const handleSaveDashboard = () => {
+  const handleOpenSaveDashboardModal = () => {
+    // Prefill from the current dashboard state
+    setSaveForm({
+      name: editedTitle,
+      description: '',
+      url: '',
+      projectId: projectList.find(p => p.name === displayProjectName)?.id || projectList[0]?.id || '',
+    });
+    setIsCreatingProject(false);
+    setNewProjectName('');
+    setShowSaveDashboardModal(true);
+  };
+
+  const handleCreateProject = () => {
+    const name = newProjectName.trim();
+    if (!name) return;
+    const id = `proj-${Date.now()}`;
+    setProjectList(prev => [...prev, { id, name }]);
+    setSaveForm(f => ({ ...f, projectId: id }));
+    setNewProjectName('');
+    setIsCreatingProject(false);
+  };
+
+  const handleConfirmSaveDashboard = () => {
+    if (!saveForm.name.trim()) return;
+    const project = projectList.find(p => p.id === saveForm.projectId);
     const dashboardConfig = {
-      title: editedTitle,
-      projectName: displayProjectName,
+      title: saveForm.name.trim(),
+      description: saveForm.description.trim(),
+      url: saveForm.url.trim(),
+      projectId: saveForm.projectId,
+      projectName: project?.name || displayProjectName,
       contentItems,
       layout: 'canvas',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
-    
+
+    setEditedTitle(saveForm.name.trim());
+    onUpdateTitle?.(saveForm.name.trim());
     onSave?.(dashboardConfig);
+    setShowSaveDashboardModal(false);
   };
 
   const formatTitle = (title: string) => {
@@ -1384,10 +2709,6 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
             <div className="flex items-center group">
               {isEditingTitle ? (
                 <div className="flex items-center gap-1">
-                  <span className="text-muted-foreground text-base font-normal">{displayProjectName}</span>
-                  <span className="text-muted-foreground text-base font-normal"> / </span>
-                  <span className="text-muted-foreground text-base font-normal">{displaySubprojectName}</span>
-                  <span className="text-muted-foreground text-base font-normal"> / </span>
                   <Input
                     value={editedTitle}
                     onChange={(e) => setEditedTitle(e.target.value)}
@@ -1396,11 +2717,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         onUpdateTitle?.(editedTitle);
                         setIsEditingTitle(false);
                       } else if (e.key === 'Escape') {
-                        setEditedTitle(dashboardTitle || initialData?.dashboardName || 'Dashboard name');
+                        setEditedTitle(dashboardTitle || initialData?.dashboardName || 'Untitled dashboard');
                         setIsEditingTitle(false);
                       }
                     }}
-                    className="h-8 text-base"
+                    className="h-8 !text-base"
                     autoFocus
                   />
                   <IconButton
@@ -1418,7 +2739,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     isPill
                     size="small"
                     onClick={() => {
-                      setEditedTitle(dashboardTitle || initialData?.dashboardName || 'Dashboard name');
+                      setEditedTitle(dashboardTitle || initialData?.dashboardName || 'Untitled dashboard');
                       setIsEditingTitle(false);
                     }}
                     aria-label="Cancel name edit"
@@ -1428,65 +2749,103 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </div>
               ) : (
                 <div className="flex items-center text-base font-normal">
-                  <span className="text-muted-foreground">{displayProjectName}</span>
-                  <span className="text-muted-foreground"> / </span>
-                  <span className="text-muted-foreground">{displaySubprojectName}</span>
-                  <span className="text-muted-foreground"> / </span>
-                  <span
-                    className="group/name flex items-center gap-1 cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors"
-                    onClick={() => setIsEditingTitle(true)}
+                  <FloraTooltip
+                    content={`${displayProjectName} / ${displaySubprojectName}`}
+                    placement="bottom"
+                    size="small"
                   >
-                    <span className="text-foreground">{editedTitle}</span>
-                    <Edit2 className={`${FLORA_ICON} opacity-0 group-hover/name:opacity-100 transition-opacity`} />
-                  </span>
+                    <span
+                      className="group/name flex items-center gap-1 cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors"
+                      onClick={() => setIsEditingTitle(true)}
+                    >
+                      <span className="text-foreground">{editedTitle}</span>
+                      <Edit2 className={`${FLORA_ICON} opacity-0 group-hover/name:opacity-100 transition-opacity`} />
+                    </span>
+                  </FloraTooltip>
                 </div>
               )}
             </div>
             <div className="flex items-center gap-2">
               {isEditing && (
                 <div className="dashboard-history-actions flex items-center gap-0.5">
-                  <IconButton
-                    isPill
-                    size="small"
-                    onClick={() => console.log('Undo action')}
-                    aria-label="Undo"
-                  >
-                    <UndoReturn className={FLORA_HEADER_ICON} />
-                  </IconButton>
-                  <IconButton
-                    isPill
-                    size="small"
-                    onClick={() => console.log('Redo action')}
-                    aria-label="Redo"
-                  >
-                    <RedoReturn className={FLORA_HEADER_ICON} />
-                  </IconButton>
-                  <IconButton
-                    isPill
-                    size="small"
-                    onClick={() => console.log('Revert changes')}
-                    aria-label="Revert"
-                  >
-                    <RefreshCw className={FLORA_HEADER_ICON} />
-                  </IconButton>
+                  <FloraTooltip content="Undo" placement="bottom" size="small">
+                    <IconButton
+                      isPill
+                      size="small"
+                      onClick={() => console.log('Undo action')}
+                      aria-label="Undo"
+                    >
+                      <UndoReturn className={FLORA_HEADER_ICON} />
+                    </IconButton>
+                  </FloraTooltip>
+                  <FloraTooltip content="Redo" placement="bottom" size="small">
+                    <IconButton
+                      isPill
+                      size="small"
+                      onClick={() => console.log('Redo action')}
+                      aria-label="Redo"
+                    >
+                      <RedoReturn className={FLORA_HEADER_ICON} />
+                    </IconButton>
+                  </FloraTooltip>
+                  <FloraTooltip content="Revert changes" placement="bottom" size="small">
+                    <IconButton
+                      isPill
+                      size="small"
+                      onClick={() => console.log('Revert changes')}
+                      aria-label="Revert"
+                    >
+                      <RefreshCw className={FLORA_HEADER_ICON} />
+                    </IconButton>
+                  </FloraTooltip>
                 </div>
               )}
               {!isEditing && (
-                <IconButton
-                  isPill
+                <FloraTooltip content="Refresh data" placement="bottom" size="small">
+                  <IconButton
+                    isPill
+                    size="small"
+                    onClick={() => console.log('Reload dashboard')}
+                    aria-label="Reload"
+                  >
+                    <Redo2 className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                  </IconButton>
+                </FloraTooltip>
+              )}
+              {!isEditing && (
+                <FloraTooltip
+                  content={isAutoRefreshing ? 'Pause auto-refresh' : 'Resume auto-refresh'}
+                  placement="bottom"
                   size="small"
-                  onClick={() => console.log('Reload dashboard')}
-                  aria-label="Reload"
                 >
-                  <Redo2 className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
-                </IconButton>
+                  <IconButton
+                    isPill
+                    size="small"
+                    onClick={() => setIsAutoRefreshing((prev) => !prev)}
+                    aria-label={isAutoRefreshing ? 'Pause auto-refresh' : 'Resume auto-refresh'}
+                    aria-pressed={!isAutoRefreshing}
+                  >
+                    {isAutoRefreshing ? (
+                      <Pause className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                    ) : (
+                      <Play className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                    )}
+                  </IconButton>
+                </FloraTooltip>
               )}
               <FloraButton
                 isPill={false}
                 size="small"
                 onClick={() => setIsEditing(!isEditing)}
               >
-                {isEditing ? 'View' : 'Edit'}
+                <FloraButton.StartIcon>
+                  {isEditing ? (
+                    <Edit2 className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                  ) : (
+                    <Eye className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                  )}
+                </FloraButton.StartIcon>
+                {isEditing ? 'Editing' : 'Viewing'}
               </FloraButton>
               {isEditing ? (
               <SplitButton className="flora-split-button">
@@ -1494,11 +2853,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   isPrimary
                   isPill={false}
                   size="small"
-                  onClick={handleSaveDashboard}
+                  onClick={handleOpenSaveDashboardModal}
                 >
                   Save
                 </FloraButton>
                 <Menu
+                  className="flora-split-button-menu"
                   placement="bottom-end"
                   hasArrow={false}
                   onChange={(changes) => {
@@ -1515,7 +2875,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   )}
                 >
                   <Item value="save-as">
-                    <MD tag="span" className="!text-foreground">Save as</MD>
+                    <MD tag="span" className="!text-foreground">Save dashboard as a new</MD>
                   </Item>
                   <Item value="archive">
                     <MD tag="span" className="!text-foreground">Archive</MD>
@@ -1523,54 +2883,62 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </Menu>
               </SplitButton>
               ) : (
+              <SplitButton className="flora-split-button">
                 <FloraButton
                   isPrimary
-                  isPill
+                  isPill={false}
                   size="small"
                   onClick={() => console.log('Share dashboard')}
                 >
                   Share
                 </FloraButton>
+                <Menu
+                  className="flora-split-button-menu"
+                  placement="bottom-end"
+                  hasArrow={false}
+                  onChange={(changes) => {
+                    if (changes.type !== 'menuItem:click' || !changes.value) return;
+                    if (changes.value === 'share-link') {
+                      console.log('Share a link');
+                    }
+                    if (changes.value === 'export') {
+                      console.log('Export');
+                    }
+                  }}
+                  button={(props) => (
+                    <ChevronButton {...props} isPrimary isPill={false} size="small" />
+                  )}
+                >
+                  <Item value="share-link">
+                    <MD tag="span" className="!text-foreground">Share a link</MD>
+                  </Item>
+                  <Item value="export">
+                    <MD tag="span" className="!text-foreground">Export</MD>
+                  </Item>
+                </Menu>
+              </SplitButton>
               )}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton
-                    isPill
-                    size="small"
-                    aria-label="More actions"
-                  >
-                    <MoreVertical className={FLORA_HEADER_ICON} />
-                  </IconButton>
-                </DropdownMenuTrigger>
+                <FloraTooltip content="More actions" placement="bottom" size="small">
+                  <DropdownMenuTrigger asChild>
+                    <IconButton
+                      isPill
+                      size="small"
+                      aria-label="More actions"
+                    >
+                      <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                    </IconButton>
+                  </DropdownMenuTrigger>
+                </FloraTooltip>
                 <DropdownMenuContent align="end" className="w-48">
                   {isEditing ? (
                     <>
-                      <DropdownMenuItem onClick={() => console.log('Interactions')}>
-                        <MD tag="span" className="!text-foreground">Interactions</MD>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log('Config')}>
-                        <MD tag="span" className="!text-foreground">Config</MD>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => console.log('Dev mode')}>
-                        <MD tag="span" className="!text-foreground">Dev mode</MD>
+                      <DropdownMenuItem onClick={() => console.log('View dev mode')}>
+                        <MD tag="span" className="!text-foreground">View dev mode</MD>
                       </DropdownMenuItem>
                     </>
                   ) : (
                     <>
-                      <DropdownMenuItem
-                        className="gap-3"
-                        onClick={() => console.log('Export dashboard')}
-                      >
-                        <Download className={FLORA_MENU_ICON} />
-                        <MD tag="span" className="!text-foreground">Export</MD>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="gap-3"
-                        onClick={() => console.log('Schedule dashboard')}
-                      >
-                        <Clock className={FLORA_MENU_ICON} />
-                        <MD tag="span" className="!text-foreground">Schedule</MD>
-                      </DropdownMenuItem>
                       <DropdownMenuItem
                         className="gap-3"
                         onClick={() => setShowVersionHistory(true)}
@@ -1588,51 +2956,117 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
 
         {/* Toolbar */}
         {isEditing && (
-          <div className="border-b border-border bg-white px-6 py-3">
-            <div className="flex items-center gap-1">
+          <div className="border-b border-border bg-white px-6 py-1.5">
+            <div className="flex items-center gap-3">
               {toolbarItems.map((tool) => (
-                <Button
-                  key={tool.id}
-                  variant={selectedTool === tool.id ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => handleToolSelect(tool.id)}
-                  className={`gap-2 ${FLORA_BTN}`}
-                >
-                  {tool.icon}
-                  {tool.label}
-                </Button>
+                'isDropdown' in tool && tool.isDropdown ? (
+                  <DropdownMenu key={tool.id}>
+                    <FloraTooltip content={tool.label} placement="bottom" size="small">
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={tool.label}
+                          className={`gap-0.5 px-1.5 shrink-0 ${FLORA_BTN}`}
+                        >
+                          {tool.icon}
+                          <ChevronDown className={FLORA_ICON} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </FloraTooltip>
+                    <DropdownMenuContent align="start" className="w-44">
+                      {tool.children?.map((child) => (
+                        <DropdownMenuItem
+                          key={child.id}
+                          className="gap-3"
+                          onClick={() => handleToolSelect(child.id)}
+                        >
+                          {child.icon}
+                          <MD tag="span" className="!text-foreground">{child.label}</MD>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <FloraTooltip
+                    key={tool.id}
+                    content={'disabled' in tool && tool.disabled ? `${tool.label} - Coming soon` : tool.label}
+                    placement="bottom"
+                    size="small"
+                  >
+                    <Button
+                      variant={selectedTool === tool.id ? "secondary" : "ghost"}
+                      size="sm"
+                      aria-label={tool.label}
+                      aria-disabled={'disabled' in tool && tool.disabled ? true : undefined}
+                      onClick={() => {
+                        if ('disabled' in tool && tool.disabled) return;
+                        handleToolSelect(tool.id);
+                      }}
+                      className={`h-8 w-8 shrink-0 p-0 ${FLORA_BTN} ${'disabled' in tool && tool.disabled ? 'opacity-50 hover:!bg-transparent' : ''}`}
+                    >
+                      {tool.icon}
+                    </Button>
+                  </FloraTooltip>
+                )
               ))}
+
+              {/* Layout controls — pushed to the right */}
+              <div className="flex-grow" aria-hidden="true" />
+
+              <FloraTooltip content="Edit layout" placement="bottom" size="small">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Edit layout"
+                  onClick={() => console.log('Edit layout')}
+                  className={`h-8 w-8 shrink-0 p-0 ${FLORA_BTN}`}
+                >
+                  <Palette className={FLORA_TOOLBAR_ICON} />
+                </Button>
+              </FloraTooltip>
             </div>
           </div>
         )}
 
         {/* Filter Bar - Always visible */}
-        <div className="border-b border-border bg-white px-6 py-2.5">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="border-b border-border bg-white px-6 py-1.5">
+          <div className="flex items-center gap-2">
+           <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`gap-2 ${FLORA_BTN} hover:bg-muted`}
+                  className={`gap-2 ${FLORA_BTN} !rounded-[8px] ${activeBookmarkId ? 'bg-[#1f73b7]/10 !text-[#1f73b7] hover:bg-[#1f73b7]/15' : 'hover:bg-muted'}`}
                 >
-                  <Bookmark className={FLORA_ICON} />
-                  <span>Saved views</span>
-                  <ChevronDown className={FLORA_ICON} />
+                  <Bookmark className={`${FLORA_ICON} ${activeBookmarkId ? '!text-[#1f73b7]' : ''}`} />
+                  <span className="!text-[12px] !leading-4 !font-semibold">{savedFilteredViews.find(v => v.id === activeBookmarkId)?.name || 'Saved views'}</span>
+                  <ChevronDown className={`${FLORA_ICON} ${activeBookmarkId ? '!text-[#1f73b7]' : ''}`} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleClearSavedView}
+                  className={`flex items-center gap-2 ${!activeBookmarkId ? 'bg-[#1f73b7]/10 focus:bg-[#1f73b7]/15 data-[highlighted]:bg-[#1f73b7]/15' : ''}`}
+                >
+                  {!activeBookmarkId && <Check className={`${FLORA_MENU_ICON} !text-[#1f73b7]`} />}
+                  <MD tag="span" className={`${!activeBookmarkId ? '!text-[#1f73b7]' : '!text-muted-foreground'} ${!activeBookmarkId ? '' : 'ml-6'}`}>None</MD>
+                </DropdownMenuItem>
+                {savedFilteredViews.length > 0 && (
+                  <div className="border-t border-border my-1"></div>
+                )}
                 {savedFilteredViews.map((view) => (
                   <DropdownMenuItem
                     key={view.id}
                     onClick={() => handleApplySavedView(view.id)}
-                    className="flex items-center justify-between group"
+                    className={`flex items-center justify-between group ${activeBookmarkId === view.id ? 'bg-[#1f73b7]/10 focus:bg-[#1f73b7]/15 data-[highlighted]:bg-[#1f73b7]/15' : ''}`}
                   >
                     <div className="flex items-center gap-2">
                       {activeBookmarkId === view.id && (
-                        <Check className={FLORA_MENU_ICON} />
+                        <Check className={`${FLORA_MENU_ICON} !text-[#1f73b7]`} />
                       )}
-                      <MD tag="span" className={`!text-foreground ${activeBookmarkId === view.id ? '' : 'ml-6'}`}>{view.name}</MD>
+                      <MD tag="span" className={`${activeBookmarkId === view.id ? '!text-[#1f73b7]' : '!text-foreground'} ${activeBookmarkId === view.id ? '' : 'ml-6'}`}>{view.name}</MD>
                     </div>
                     <button
                       onClick={(e) => handleDeleteBookmark(view.id, e)}
@@ -1647,6 +3081,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 )}
                 {isBookmarkModified && activeBookmarkId && (
                   <>
+                    <div className="border-t border-border my-1"></div>
                     <DropdownMenuItem className="gap-2" onClick={handleSaveBookmark}>
                       <Save className={FLORA_MENU_ICON} />
                       <MD tag="span" className="!text-foreground">Save</MD>
@@ -1655,13 +3090,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       <Save className={FLORA_MENU_ICON} />
                       <MD tag="span" className="!text-foreground">Save as new</MD>
                     </DropdownMenuItem>
-                    <div className="border-t border-border my-1"></div>
                   </>
                 )}
-                <DropdownMenuItem className="gap-2" onClick={handleOpenSaveBookmarkModal}>
-                  <Save className={FLORA_MENU_ICON} />
-                  <MD tag="span" className="!text-foreground">Save as view</MD>
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -1688,11 +3118,68 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 onRemove={handleRemoveFilter}
               />
             ))}
+
+            {/* Event filter chip (from Figma) — sits next to the default time filter */}
+            {showEventFilter && (
+              <div className="inline-flex h-8 w-fit shrink-0 items-center gap-2 rounded-[8px] border border-[#dcdcda] bg-white px-2">
+                <FloraTooltip content="Cross filter" placement="bottom" size="small">
+                  <span className="inline-flex shrink-0">
+                    <CheckSquareStroke className="text-[#2f3130]" style={{ width: 16, height: 16 }} aria-hidden />
+                  </span>
+                </FloraTooltip>
+                <MD tag="span" className={FILTER_ACTIVE_LABEL}>
+                  Deal created
+                </MD>
+                <MD tag="span" className={FILTER_ACTIVE_VALUES}>
+                  In admin
+                </MD>
+                <button
+                  type="button"
+                  aria-label="Remove filter"
+                  onClick={() => setShowEventFilter(false)}
+                  className="ml-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[#68737d] transition-colors hover:bg-[#f0f0f0] hover:text-[#2f3130]"
+                >
+                  <X style={{ width: 12, height: 12 }} aria-hidden />
+                </button>
+              </div>
+            )}
+           </div>
+
+            {/* Overflow menu — right side of the filter bar */}
+            <DropdownMenu>
+              <FloraTooltip content="More options" placement="bottom" size="small">
+                <DropdownMenuTrigger asChild>
+                  <IconButton isPill size="small" aria-label="Filter options" className="shrink-0">
+                    <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                  </IconButton>
+                </DropdownMenuTrigger>
+              </FloraTooltip>
+              <DropdownMenuContent align="end" className="w-48">
+                {isEditing && (
+                  <DropdownMenuItem className="gap-2" onClick={() => console.log('Merge columns')}>
+                    <Connector className={FLORA_MENU_ICON} />
+                    <MD tag="span" className="!text-foreground">Merge columns</MD>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  className="gap-2"
+                  disabled={activeFilters.length === 0}
+                  onClick={handleResetFilters}
+                >
+                  <RefreshCw className={FLORA_MENU_ICON} />
+                  <MD tag="span" className="!text-foreground">Revert filters</MD>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2" onClick={() => console.log('Create filter set')}>
+                  <Filter className={FLORA_MENU_ICON} />
+                  <MD tag="span" className="!text-foreground">Create filter set</MD>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
         {/* Dashboard Tabs */}
-        <div className="dashboard-tab-bar bg-white px-6">
+        <div className="dashboard-tab-bar flex items-end min-h-[40px] border-b border-border bg-white px-6">
           <Tabs
             selectedItem={activeTabId}
             onChange={(item) => {
@@ -1742,7 +3229,16 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         <div className="flex-1 overflow-auto" style={{ backgroundColor: CANVAS_BG }}>
           <div
             className="relative w-full h-full min-h-[600px] cursor-crosshair"
-            style={{ backgroundColor: CANVAS_BG }}
+            style={{
+              backgroundColor: CANVAS_BG,
+              ...(isEditing
+                ? {
+                    backgroundImage: 'radial-gradient(#d1d5db 1.2px, transparent 1.2px)',
+                    backgroundSize: '20px 20px',
+                    backgroundPosition: '10px 10px',
+                  }
+                : {}),
+            }}
             onClick={handleCanvasClick}
           >
             {contentItems.length === 0 && (
@@ -1755,18 +3251,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               // Text items render as a bare, editable box with a floating toolbar
               if (item.type === 'text') {
                 const isTextEditing = editingTextId === item.id;
+                const isTextSelected = selectedItemId === item.id;
                 const toolbarBelow = item.position.y < 60; // flip toolbar below when near the top
                 const align = item.content?.align || 'left';
                 const textSize = item.content?.fontSize || 16;
                 const textColor = item.content?.color || '#2f3941';
-                const sizeOptions = [
-                  { label: 'Small', value: 14 },
-                  { label: 'Medium', value: 16 },
-                  { label: 'Large', value: 20 },
-                  { label: 'Title', value: 28 },
-                ];
-                const sizeLabel = sizeOptions.find(s => s.value === textSize)?.label || 'Medium';
-                const colorSwatches = ['#2f3941', '#1f73b7', '#038153', '#c72a1c', '#ad5e18', '#6b46c1', '#68737d', '#ffffff'];
+                const clampSize = (n: number) => Math.max(8, Math.min(200, Math.round(n)));
                 const alignIcon =
                   align === 'center' ? <AlignCenter className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
                   : align === 'right' ? <AlignRight className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
@@ -1774,35 +3264,43 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 return (
                   <div
                     key={item.id}
-                    className="absolute group/text"
+                    className={`absolute group/text rounded-[16px] ${isTextSelected ? 'outline outline-2 outline-[#1f73b7] outline-offset-2' : ''}`}
                     style={{
                       left: item.position.x,
                       top: item.position.y,
                       width: item.size.width,
+                      height: item.content?.style?.resized ? item.size.height : undefined,
                     }}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                   >
                     {/* Floating contextual toolbar */}
-                    {isEditing && isTextEditing && (
+                    {isEditing && (isTextEditing || isTextSelected) && (
                       <div
-                        className={`absolute left-0 z-[300] flex items-center gap-1 rounded-[12px] bg-[#1a1a1a] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.25)] ${toolbarBelow ? 'top-full mt-2' : '-top-12'}`}
+                        className={`absolute left-0 z-[300] flex items-center gap-1 rounded-[12px] bg-white border border-[#dcdcda] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)] ${toolbarBelow ? 'top-full mt-2' : '-top-12'}`}
                         onMouseDown={(e) => e.preventDefault()}
                       >
                         <button
-                          className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${item.content?.bold ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                          className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${item.content?.bold ? 'bg-muted' : 'hover:bg-muted'}`}
                           onClick={() => handleUpdateTextContent(item.id, { bold: !item.content?.bold })}
                           aria-label="Bold"
                         >
-                          <Bold className="size-[16px] shrink-0 text-white" style={{ width: 16, height: 16 }} />
+                          <Bold className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+                        </button>
+                        <button
+                          className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${item.content?.underline ? 'bg-muted' : 'hover:bg-muted'}`}
+                          onClick={() => handleUpdateTextContent(item.id, { underline: !item.content?.underline })}
+                          aria-label="Underline"
+                        >
+                          <span className="text-sm font-medium leading-none text-foreground underline">U</span>
                         </button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 hover:bg-white/10 transition-colors"
+                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 hover:bg-muted transition-colors"
                               aria-label="Text alignment"
                             >
-                              <span className="text-white">{alignIcon}</span>
-                              <ChevronDown className="size-[14px] shrink-0 text-white/70" style={{ width: 14, height: 14 }} />
+                              <span className="text-foreground">{alignIcon}</span>
+                              <ChevronDown className="size-[14px] shrink-0 text-muted-foreground" style={{ width: 14, height: 14 }} />
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="start">
@@ -1818,24 +3316,27 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <div className="mx-0.5 h-5 w-px bg-white/15" />
+                        <div className="mx-0.5 h-5 w-px bg-[#dcdcda]" />
 
-                        {/* Font size */}
+                        {/* Font size selector */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 hover:bg-white/10 transition-colors"
+                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 hover:bg-muted transition-colors"
                               aria-label="Text size"
                             >
-                              <span className="text-sm text-white">{sizeLabel}</span>
-                              <ChevronDown className="size-[14px] shrink-0 text-white/70" style={{ width: 14, height: 14 }} />
+                              <span className="text-sm leading-none text-foreground">{textSize}</span>
+                              <ChevronDown className="size-[14px] shrink-0 text-muted-foreground" style={{ width: 14, height: 14 }} />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start">
-                            {sizeOptions.map((s) => (
-                              <DropdownMenuItem key={s.value} onClick={() => handleUpdateTextContent(item.id, { fontSize: s.value })}>
-                                {textSize === s.value && <Check className={FLORA_MENU_ICON} />}
-                                <MD tag="span" className={`!text-foreground ${textSize === s.value ? 'ml-2' : 'ml-6'}`}>{s.label}</MD>
+                          <DropdownMenuContent align="start" className="min-w-[64px] max-h-64 overflow-y-auto">
+                            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64].map((s) => (
+                              <DropdownMenuItem
+                                key={s}
+                                onClick={() => handleUpdateTextContent(item.id, { fontSize: clampSize(s) })}
+                                className={textSize === s ? 'bg-muted' : ''}
+                              >
+                                <MD tag="span" className="!text-foreground">{s}</MD>
                               </DropdownMenuItem>
                             ))}
                           </DropdownMenuContent>
@@ -1845,114 +3346,455 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 hover:bg-white/10 transition-colors"
+                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 hover:bg-muted transition-colors"
                               aria-label="Text color"
                             >
-                              <span className="flex h-4 w-4 items-center justify-center rounded-full border border-white/40" style={{ backgroundColor: textColor }} />
-                              <ChevronDown className="size-[14px] shrink-0 text-white/70" style={{ width: 14, height: 14 }} />
+                              <TextColor className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+                              <ChevronDown className="size-[14px] shrink-0 text-muted-foreground" style={{ width: 14, height: 14 }} />
                             </button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="p-2">
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {colorSwatches.map((c) => (
-                                <button
-                                  key={c}
-                                  onClick={() => handleUpdateTextContent(item.id, { color: c })}
-                                  aria-label={`Color ${c}`}
-                                  className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${textColor === c ? 'ring-2 ring-[#1f73b7] ring-offset-1' : 'border-[#dcdcda]'}`}
-                                  style={{ backgroundColor: c }}
-                                />
-                              ))}
+                          <DropdownMenuContent align="start" className="w-56 p-3">
+                            <span className="mb-2 block text-xs text-muted-foreground">Text color</span>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <FloraColorPicker
+                                value={textColor}
+                                onChange={(c) => handleUpdateTextContent(item.id, { color: c })}
+                                palette={TEXT_STYLE_PALETTE}
+                              />
                             </div>
                           </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <div className="mx-0.5 h-5 w-px bg-white/15" />
+                        <div className="mx-0.5 h-5 w-px bg-[#dcdcda]" />
+
+                        <Popover
+                          open={textLinkModalItemId === item.id}
+                          onOpenChange={(open) => setTextLinkModalItemId(open ? item.id : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${item.content?.link ? 'bg-muted' : 'hover:bg-muted'}`}
+                              aria-label={item.content?.link ? 'Edit link' : 'Add link'}
+                            >
+                              <Link className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="start"
+                            side="bottom"
+                            sideOffset={8}
+                            collisionPadding={16}
+                            className="w-80 max-h-[min(70vh,var(--radix-popover-content-available-height))] overflow-y-auto"
+                            onOpenAutoFocus={(e) => e.preventDefault()}
+                          >
+                            <TextLinkEditor
+                              key={item.id + (item.content?.link ? '-edit' : '-new')}
+                              initialLink={(item.content?.link as TextLink | null) || null}
+                              onSave={handleSaveTextLink}
+                              onRemove={handleRemoveTextLink}
+                            />
+                          </PopoverContent>
+                        </Popover>
 
                         <button
-                          className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${item.content?.link ? 'bg-white/20' : 'hover:bg-white/10'}`}
-                          onClick={() => { setLinkDraft(item.content?.link || ''); setLinkPopoverTextId(linkPopoverTextId === item.id ? null : item.id); }}
-                          aria-label="Add link"
-                        >
-                          <Link className="size-[16px] shrink-0 text-white" style={{ width: 16, height: 16 }} />
-                        </button>
-                        <button
-                          className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-white/10 transition-colors"
+                          className="flex h-8 w-8 items-center justify-center rounded-[8px] hover:bg-muted transition-colors"
                           onClick={() => handleUpdateTextContent(item.id, { list: !item.content?.list })}
                           aria-label="Bulleted list"
                         >
-                          <List className="size-[16px] shrink-0 text-white" style={{ width: 16, height: 16 }} />
+                          <List className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
                         </button>
 
-                        {/* Link input popover */}
-                        {linkPopoverTextId === item.id && (
-                          <div
-                            className="absolute top-11 left-0 z-[310] flex items-center gap-1 rounded-[8px] border border-[#dcdcda] bg-white p-1.5 shadow-lg"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Input
-                              value={linkDraft}
-                              onChange={(e) => setLinkDraft(e.target.value)}
-                              placeholder="Paste or type a link"
-                              className="h-8 w-56 text-sm"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') { handleUpdateTextContent(item.id, { link: linkDraft || null }); setLinkPopoverTextId(null); }
-                                else if (e.key === 'Escape') { setLinkPopoverTextId(null); }
-                              }}
-                            />
-                            <IconButton isPill size="small" aria-label="Apply link" onClick={() => { handleUpdateTextContent(item.id, { link: linkDraft || null }); setLinkPopoverTextId(null); }}>
-                              <Check className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
-                            </IconButton>
-                          </div>
-                        )}
+                        <div className="mx-0.5 h-5 w-px bg-[#dcdcda]" />
+
+                        {(() => {
+                          const ts = item.content?.style || {};
+                          const sShadow = ts.shadow === true;
+                          const sBorder = ts.border === true;
+                          const sBorderColor = ts.borderColor || '#e5e7eb';
+                          const sBorderWidth = ts.borderWidth ?? 1;
+                          const sBg = ts.bgColor || 'transparent';
+                          const patchStyle = (patch: Record<string, any>) =>
+                            handleUpdateTextContent(item.id, { style: { ...ts, ...patch } });
+                          return (
+                            <>
+                              {/* Component background */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${sBg !== 'transparent' ? 'bg-muted' : 'hover:bg-muted'}`}
+                                    aria-label="Component background"
+                                  >
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-[#dcdcda]" style={{ backgroundColor: sBg === 'transparent' ? '#ffffff' : sBg }} />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-56 p-3">
+                                  <span className="mb-2 block text-xs text-muted-foreground">Background</span>
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <FloraColorPicker value={sBg} onChange={(c) => patchStyle({ bgColor: c })} allowTransparent palette={TEXT_STYLE_PALETTE} />
+                                  </div>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+
+                              {/* Drop shadow toggle */}
+                              <button
+                                className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${sShadow ? 'bg-muted' : 'hover:bg-muted'}`}
+                                onClick={() => patchStyle({ shadow: !sShadow })}
+                                aria-label="Drop shadow"
+                                aria-pressed={sShadow}
+                              >
+                                <Sun className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+                              </button>
+
+                              {/* Border: toggle + weight + color */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${sBorder ? 'bg-muted' : 'hover:bg-muted'}`}
+                                    aria-label="Border"
+                                  >
+                                    <StopStroke className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="w-56 p-3 space-y-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-xs text-muted-foreground">Border</span>
+                                    <button
+                                      role="switch"
+                                      aria-checked={sBorder}
+                                      aria-label="Toggle border"
+                                      onClick={(e) => { e.stopPropagation(); patchStyle({ border: !sBorder }); }}
+                                      className={`relative h-5 w-9 rounded-full transition-colors ${sBorder ? 'bg-[#1f73b7]' : 'bg-[#dcdcda]'}`}
+                                    >
+                                      <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${sBorder ? 'left-[18px]' : 'left-0.5'}`} />
+                                    </button>
+                                  </div>
+                                  <div className={`space-y-3 ${sBorder ? '' : 'opacity-40 pointer-events-none'}`}>
+                                    <div className="flex items-center justify-between gap-3">
+                                      <span className="text-xs text-muted-foreground">Weight</span>
+                                      <div className="flex items-center rounded-[8px] border border-[#dcdcda]" onClick={(e) => e.stopPropagation()}>
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={20}
+                                          value={sBorderWidth}
+                                          onChange={(e) => {
+                                            const n = parseInt(e.target.value, 10);
+                                            if (!Number.isNaN(n)) patchStyle({ border: true, borderWidth: Math.max(1, Math.min(20, n)) });
+                                          }}
+                                          className="h-7 w-12 rounded-[8px] bg-transparent px-2 text-sm text-foreground [appearance:textfield] focus:outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                          aria-label="Border weight in pixels"
+                                        />
+                                        <span className="pr-2 text-xs text-muted-foreground">px</span>
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <span className="text-xs text-muted-foreground">Border color</span>
+                                      <FloraColorPicker value={sBorderColor} onChange={(c) => patchStyle({ border: true, borderColor: c })} palette={TEXT_STYLE_PALETTE} />
+                                    </div>
+                                  </div>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+
+                              {/* Delete component */}
+                              <div className="mx-0.5 h-5 w-px bg-[#dcdcda]" />
+                              <button
+                                className="flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors hover:bg-[#c72a1c]/10"
+                                onClick={(e) => { e.stopPropagation(); setContentItems(items => items.filter(i => i.id !== item.id)); }}
+                                aria-label="Delete component"
+                              >
+                                <Trash2 className="size-[16px] shrink-0" style={{ width: 16, height: 16, color: '#c72a1c' }} />
+                              </button>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
 
                     {/* Editable text field */}
-                    <textarea
-                      value={item.content?.text || ''}
-                      readOnly={!isEditing}
-                      onChange={(e) => handleUpdateTextContent(item.id, { text: e.target.value })}
-                      onFocus={() => setEditingTextId(item.id)}
-                      placeholder="Add text"
-                      autoFocus={isTextEditing}
-                      rows={1}
-                      className={`w-full resize-none rounded-[8px] bg-transparent px-3 py-2 leading-snug text-foreground placeholder:text-[#a3a3a3] focus:outline-none transition-colors ${
-                        isTextEditing ? 'border border-[#1f73b7] bg-white shadow-[0_0_0_2px_rgba(31,115,183,0.15)]' : 'border border-transparent hover:border-[#dcdcda]'
-                      } ${item.content?.bold ? 'font-semibold' : 'font-normal'}`}
-                      style={{
-                        textAlign: (item.content?.align || 'left') as any,
-                        textDecoration: item.content?.link ? 'underline' : 'none',
-                        fontSize: `${item.content?.fontSize || 16}px`,
-                        color: item.content?.color || (item.content?.link ? '#1f73b7' : undefined),
-                      }}
-                    />
-                    {isEditing && (
-                      <button
-                        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-white border border-[#dcdcda] opacity-0 group-hover/text:opacity-100 transition-opacity shadow-sm"
-                        onClick={(e) => { e.stopPropagation(); setContentItems(items => items.filter(i => i.id !== item.id)); }}
-                        aria-label="Remove text"
-                      >
-                        <Plus className={`${FLORA_ICON} rotate-45`} style={{ width: 12, height: 12 }} />
-                      </button>
+                    {(() => {
+                      const ts = item.content?.style || {};
+                      const tShadow = ts.shadow === true; // text default OFF (bare text)
+                      const tBorder = ts.border === true; // text default OFF
+                      const tBorderColor = ts.borderColor || '#e5e7eb';
+                      const tBorderWidth = ts.borderWidth ?? 1;
+                      const tBg = ts.bgColor && ts.bgColor !== 'transparent' ? ts.bgColor : undefined;
+                      return (
+                        <textarea
+                          value={item.content?.text || ''}
+                          readOnly={!isEditing}
+                          onChange={(e) => handleUpdateTextContent(item.id, { text: e.target.value })}
+                          onFocus={() => setEditingTextId(item.id)}
+                          placeholder="Add text"
+                          autoFocus={isTextEditing}
+                          rows={1}
+                          className={`w-full resize-none rounded-[16px] px-3 py-2 leading-snug text-foreground placeholder:text-[#a3a3a3] focus:outline-none transition-colors ${ts.resized ? 'h-full' : ''} ${
+                            isTextEditing ? 'ring-1 ring-[#1f73b7] shadow-[0_0_0_2px_rgba(31,115,183,0.15)]' : ''
+                          } ${item.content?.bold ? 'font-semibold' : 'font-normal'}`}
+                          style={{
+                            textAlign: (item.content?.align || 'left') as any,
+                            textDecoration: (item.content?.underline || item.content?.link) ? 'underline' : 'none',
+                            fontSize: `${item.content?.fontSize || 16}px`,
+                            color: item.content?.color || (item.content?.link ? '#1f73b7' : undefined),
+                            backgroundColor: tBg,
+                            border: tBorder ? `${tBorderWidth}px solid ${tBorderColor}` : (isTextEditing ? undefined : '1px solid transparent'),
+                            boxShadow: tShadow && !isTextEditing ? '0 4px 16px rgba(0,0,0,0.08)' : undefined,
+                          }}
+                        />
+                      );
+                    })()}
+                    {isEditing && isTextSelected && (
+                      <ResizeHandles onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
                     )}
                   </div>
                 );
               }
+              if (item.type === 'section') {
+                const secStyle = item.content?.style || {};
+                const secShadow = secStyle.shadow === true;
+                const secBorder = secStyle.border !== false;
+                const secBorderColor = secStyle.borderColor || '#D8DCDE';
+                const secBorderWidth = secStyle.borderWidth ?? 1;
+                const secBg = secStyle.bgColor || '#FFFFFF';
+                const isSecSelected = selectedItemId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`absolute group/section rounded-[16px] ${secShadow ? 'shadow-[0_4px_16px_rgba(0,0,0,0.08)]' : ''} ${isSecSelected ? 'outline outline-2 outline-[#1f73b7] outline-offset-2' : ''}`}
+                    style={{
+                      left: item.position.x,
+                      top: item.position.y,
+                      width: item.size.width,
+                      height: item.size.height,
+                      backgroundColor: secBg,
+                      border: secBorder ? `${secBorderWidth}px solid ${secBorderColor}` : 'none',
+                    }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                  >
+                    {isEditing && isSecSelected && (
+                      <ResizeHandles onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
+                    )}
+                    {isEditing && isSecSelected && (
+                      <div
+                        className={`absolute left-0 z-[300] flex items-center gap-1 rounded-[12px] bg-white border border-[#dcdcda] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)] ${item.position.y < 60 ? 'top-full mt-2' : '-top-12'}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <WidgetStyleControls
+                          style={item.content?.style}
+                          defaultBorderOn
+                          onChange={(patch) => handleUpdateTextContent(item.id, { style: { ...(item.content?.style || {}), ...patch } })}
+                          onDelete={() => setContentItems(items => items.filter(i => i.id !== item.id))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.type === 'separator') {
+                const sepStyle = item.content?.style || {};
+                const sepWeight = sepStyle.borderWidth ?? 2;
+                const sepColor = sepStyle.borderColor || '#5C6970';
+                const isSepSelected = selectedItemId === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`absolute group/sep flex items-center rounded-[4px] ${isSepSelected ? 'outline outline-2 outline-[#1f73b7] outline-offset-2' : ''}`}
+                    style={{
+                      left: item.position.x,
+                      top: item.position.y,
+                      width: item.size.width,
+                      height: item.size.height,
+                    }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                  >
+                    <div
+                      className="w-full rounded-full"
+                      style={{ height: sepWeight, backgroundColor: sepColor }}
+                    />
+                    {isEditing && isSepSelected && (
+                      <ResizeHandles horizontalOnly onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
+                    )}
+                    {isEditing && isSepSelected && (
+                      <div
+                        className={`absolute left-0 z-[300] flex items-center gap-1 rounded-[12px] bg-white border border-[#dcdcda] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)] ${item.position.y < 60 ? 'top-full mt-2' : '-top-12'}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Weight */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="flex h-8 items-center gap-1 rounded-[8px] px-2 text-sm text-foreground transition-colors hover:bg-muted"
+                              aria-label="Separator weight"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span className="inline-block w-5 rounded-full" style={{ height: Math.min(sepWeight, 6), backgroundColor: '#1C2227' }} />
+                              <span className="text-xs text-muted-foreground">{sepWeight}px</span>
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-xs text-muted-foreground">Weight</span>
+                              <div className="flex items-center rounded-[8px] border border-[#dcdcda]" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={20}
+                                  value={sepWeight}
+                                  onChange={(e) => {
+                                    const n = parseInt(e.target.value, 10);
+                                    if (!Number.isNaN(n)) handleUpdateTextContent(item.id, { style: { ...sepStyle, borderWidth: Math.max(1, Math.min(20, n)) } });
+                                  }}
+                                  className="h-7 w-12 rounded-[8px] bg-transparent px-2 text-sm text-foreground [appearance:textfield] focus:outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  aria-label="Separator weight in pixels"
+                                />
+                                <span className="pr-2 text-xs text-muted-foreground">px</span>
+                              </div>
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Color */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors hover:bg-muted"
+                              aria-label="Separator color"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full border border-[#dcdcda]" style={{ backgroundColor: sepColor }} />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
+                            <span className="mb-2 block text-xs text-muted-foreground">Color</span>
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <FloraColorPicker value={sepColor} onChange={(c) => handleUpdateTextContent(item.id, { style: { ...sepStyle, borderColor: c } })} palette={TEXT_STYLE_PALETTE} />
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        {/* Delete */}
+                        <div className="mx-0.5 h-5 w-px bg-[#dcdcda]" />
+                        <button
+                          className="flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors hover:bg-[#c72a1c]/10"
+                          onClick={(e) => { e.stopPropagation(); setContentItems(items => items.filter(i => i.id !== item.id)); }}
+                          aria-label="Delete separator"
+                        >
+                          <Trash2 className="size-[16px] shrink-0" style={{ width: 16, height: 16, color: '#c72a1c' }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.type === 'link') {
+                const lc: LinkContent = { ...createDefaultLinkContent(), ...(item.content || {}) };
+                const fmt = { ...createDefaultLinkContent().format, ...(lc.format || {}) };
+                const linkStyle: React.CSSProperties = {
+                  fontFamily: fmt.fontStyle === 'Default' ? undefined : fmt.fontStyle,
+                  fontSize: `${fmt.fontSize}px`,
+                  color: fmt.color,
+                  backgroundColor:
+                    fmt.highlight && fmt.highlight !== 'transparent' ? fmt.highlight : undefined,
+                  fontWeight: fmt.bold ? 700 : 400,
+                  fontStyle: fmt.italic ? 'italic' : 'normal',
+                  textDecoration: fmt.underline ? 'underline' : 'none',
+                };
+                const labelText = lc.label?.trim() || 'Link';
+                return (
+                  <div
+                    key={item.id}
+                    className="absolute group/link"
+                    style={{
+                      left: item.position.x,
+                      top: item.position.y,
+                      width: item.size.width,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-1 py-1" style={{ textAlign: fmt.align }}>
+                      <a
+                        href={lc.linkType === 'hyperlink' ? lc.url || '#' : '#'}
+                        target={lc.openInTab === 'new-tab' ? '_blank' : undefined}
+                        rel={lc.openInTab === 'new-tab' ? 'noopener noreferrer' : undefined}
+                        onClick={(e) => {
+                          if (isEditing) e.preventDefault();
+                        }}
+                        className="inline-flex items-center gap-1 rounded-[3px] px-0.5 hover:opacity-80 transition-opacity"
+                        style={linkStyle}
+                        title={
+                          lc.linkType === 'asset'
+                            ? lc.assetName || 'Asset link'
+                            : lc.url || 'URL'
+                        }
+                      >
+                        {lc.linkType === 'hyperlink' && (
+                          <ExternalLink style={{ width: fmt.fontSize * 0.8, height: fmt.fontSize * 0.8 }} />
+                        )}
+                        {labelText}
+                      </a>
+                    </div>
+                    {isEditing && (
+                      <div className="absolute -right-2 -top-2 flex items-center gap-1 opacity-0 group-hover/link:opacity-100 transition-opacity">
+                        <button
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-white border border-[#dcdcda] shadow-sm hover:bg-muted"
+                          onClick={(e) => { e.stopPropagation(); handleEditLink(item.id); }}
+                          aria-label="Edit link"
+                        >
+                          <Edit2 className={FLORA_ICON} style={{ width: 12, height: 12 }} />
+                        </button>
+                        <button
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-white border border-[#dcdcda] shadow-sm hover:bg-[#c72a1c]/10"
+                          onClick={(e) => { e.stopPropagation(); setContentItems(items => items.filter(i => i.id !== item.id)); }}
+                          aria-label="Remove link"
+                        >
+                          <Trash2 className={FLORA_DANGER_ICON} style={{ width: 14, height: 14, color: '#c72a1c' }} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              const wstyle = item.content?.style || {};
+              const wShadow = wstyle.shadow === true; // reports default OFF (no drop shadow)
+              const wBorder = wstyle.border !== false; // reports default ON (stroke)
+              const wBorderColor = wstyle.borderColor || '#e5e7eb';
+              const wBorderWidth = wstyle.borderWidth ?? 1;
+              const wBg = wstyle.bgColor || '#ffffff';
+              const isWidgetSelected = selectedItemId === item.id;
               return (
               <div
                 key={item.id}
-                className="absolute bg-white border border-gray-200 rounded-[20px]"
+                className={`absolute group/widget rounded-[16px] ${wShadow ? 'shadow-[0_4px_16px_rgba(0,0,0,0.08)]' : ''} ${isWidgetSelected ? 'outline outline-2 outline-[#1f73b7] outline-offset-2' : ''}`}
                 style={{
                   left: item.position.x,
                   top: item.position.y,
                   width: item.size.width,
-                  height: item.size.height
+                  height: item.size.height,
+                  backgroundColor: wBg,
+                  border: wBorder ? `${wBorderWidth}px solid ${wBorderColor}` : 'none',
                 }}
+                onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
               >
-                <div className="h-full p-3 flex flex-col rounded-[20px] bg-white">
-                  <div className="flex items-center justify-between gap-2 mb-2">
+                {isEditing && isWidgetSelected && (
+                  <ResizeHandles onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
+                )}
+                {isEditing && isWidgetSelected && (
+                  <div
+                    className={`absolute left-0 z-[300] flex items-center gap-1 rounded-[12px] bg-white border border-[#dcdcda] px-2 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)] ${item.position.y < 60 ? 'top-full mt-2' : '-top-12'}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <WidgetStyleControls
+                      style={item.content?.style}
+                      defaultBorderOn={item.type !== 'image'}
+                      onChange={(patch) => handleUpdateTextContent(item.id, { style: { ...(item.content?.style || {}), ...patch } })}
+                      onDelete={() => setContentItems(items => items.filter(i => i.id !== item.id))}
+                    />
+                  </div>
+                )}
+                <div
+                  className={`h-full flex flex-col rounded-[16px] overflow-hidden ${item.type === 'image' ? (wBorder || wBg !== 'transparent' ? 'p-2' : 'p-0') : 'p-3'}`}
+                  style={{ backgroundColor: wBg }}
+                >
+                  <div className={`flex items-center justify-between gap-2 ${item.type === 'image' ? 'hidden' : 'mb-2'}`}>
                     <div className="flex items-center gap-2 pl-3 pt-3">
                       {/* Live data indicator */}
                       {item.content?.liveData && (
@@ -1999,19 +3841,6 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                             <DropdownMenuItem><MD tag="span" className="!text-foreground">Last year</MD></DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      )}
-                      {isEditing && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 opacity-50 hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setContentItems(items => items.filter(i => i.id !== item.id));
-                          }}
-                        >
-                          <Plus className={`${FLORA_ICON} rotate-45`} />
-                        </Button>
                       )}
                     </div>
                   </div>
@@ -2430,7 +4259,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
 
                   {/* Image content */}
                   {item.type === 'image' && (
-                    <div className="flex-1 px-3 pb-3 min-h-0">
+                    <div className={`flex-1 min-h-0 ${item.content?.imageUrl ? '' : 'p-4'}`}>
                       {item.content?.imageUrl ? (
                         <div className="relative h-full w-full group/image">
                           <img
@@ -2473,21 +4302,15 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                             setDragOverImageId(null);
                             handleSetItemImage(item.id, e.dataTransfer.files?.[0]);
                           }}
-                          className={`flex h-full w-full flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed px-4 py-6 text-center cursor-pointer transition-colors ${
+                          className={`flex h-full w-full flex-col items-center justify-center gap-2 rounded-[8px] border border-dashed p-4 text-center cursor-pointer transition-colors bg-white ${
                             dragOverImageId === item.id
-                              ? 'border-[#1f73b7] bg-[#1f73b7]/5'
-                              : 'border-[#c2c8cc] bg-[#fafafa] hover:border-[#87929d] hover:bg-muted/40'
+                              ? 'border-[#1f73b7]'
+                              : 'border-[#8b8e89] hover:border-[#1f73b7]'
                           }`}
                         >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white border border-[#dcdcda]">
-                            <ImageStroke className={FLORA_ICON} />
-                          </div>
-                          <div className="text-sm text-foreground">
-                            <span className="text-[#1f73b7]">Click to upload</span> or drag and drop
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            PNG, JPG or GIF
-                          </div>
+                          <MD tag="span" style={{ color: '#406cc4' }}>
+                            Choose a file or drag and drop here
+                          </MD>
                           <input
                             type="file"
                             accept="image/*"
@@ -2518,6 +4341,19 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         <SelectReportModal
           onClose={() => setShowReportsModal(false)}
           onSelect={handleReportSelect}
+        />
+      )}
+
+      {/* Link Configuration Modal */}
+      {showLinkModal && linkModalItemId && (
+        <LinkConfigModal
+          initialContent={{
+            ...createDefaultLinkContent(),
+            ...(contentItems.find(i => i.id === linkModalItemId)?.content || {}),
+          }}
+          tabs={tabs.map(t => ({ id: t.id, name: t.name }))}
+          onClose={handleCloseLinkModal}
+          onSave={handleSaveLink}
         />
       )}
 
@@ -2553,6 +4389,111 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       </Dialog>
 
       {/* Save View Modal */}
+      {showSaveDashboardModal && (
+        <Modal onClose={() => setShowSaveDashboardModal(false)} restoreFocus>
+          <Modal.Header tag="h2">Save dashboard</Modal.Header>
+          <Modal.Body>
+            <div className="flex flex-col gap-6 py-1">
+              {/* Project */}
+              <Field>
+                <Field.Label className="!mb-2">Project</Field.Label>
+                {isCreatingProject ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <FloraInput
+                        value={newProjectName}
+                        onChange={(e) => setNewProjectName(e.target.value)}
+                        placeholder="New project name"
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') handleCreateProject();
+                          if (e.key === 'Escape') { setIsCreatingProject(false); setNewProjectName(''); }
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                    <FloraButton isPrimary disabled={!newProjectName.trim()} onClick={handleCreateProject}>
+                      Add
+                    </FloraButton>
+                    <FloraButton isBasic onClick={() => { setIsCreatingProject(false); setNewProjectName(''); }}>
+                      Cancel
+                    </FloraButton>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <FloraSelectField
+                        ariaLabel="Project"
+                        value={saveForm.projectId}
+                        options={projectList.map(p => ({ value: p.id, label: p.name }))}
+                        onChange={(v) => setSaveForm({ ...saveForm, projectId: v })}
+                      />
+                    </div>
+                    <Anchor
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); setIsCreatingProject(true); }}
+                      className="shrink-0 whitespace-nowrap !text-[14px] !leading-5"
+                    >
+                      Create project
+                    </Anchor>
+                  </div>
+                )}
+              </Field>
+
+              {/* Name */}
+              <Field>
+                <Field.Label>Dashboard name</Field.Label>
+                <FloraInput
+                  value={saveForm.name}
+                  onChange={(e) => setSaveForm({ ...saveForm, name: e.target.value })}
+                  placeholder="e.g., Q4 Performance overview"
+                  onKeyDown={(e) => e.stopPropagation()}
+                  autoFocus
+                />
+              </Field>
+
+              {/* Description */}
+              <Field>
+                <Field.Label>
+                  Description <span className="font-normal text-muted-foreground">(Optional)</span>
+                </Field.Label>
+                <FloraTextarea
+                  value={saveForm.description}
+                  onChange={(e) => setSaveForm({ ...saveForm, description: e.target.value })}
+                  placeholder="What does this dashboard show?"
+                  onKeyDown={(e) => e.stopPropagation()}
+                  rows={3}
+                />
+              </Field>
+
+              {/* URL */}
+              <Field>
+                <Field.Label>URL</Field.Label>
+                <FloraInput
+                  value={saveForm.url}
+                  onChange={(e) => setSaveForm({ ...saveForm, url: e.target.value })}
+                  placeholder="custom-slug"
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
+              </Field>
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Modal.FooterItem>
+              <FloraButton onClick={() => setShowSaveDashboardModal(false)}>
+                Cancel
+              </FloraButton>
+            </Modal.FooterItem>
+            <Modal.FooterItem>
+              <FloraButton isPrimary disabled={!saveForm.name.trim()} onClick={handleConfirmSaveDashboard}>
+                Save dashboard
+              </FloraButton>
+            </Modal.FooterItem>
+          </Modal.Footer>
+          <Modal.Close aria-label="Close" />
+        </Modal>
+      )}
+
       <Dialog open={showSaveBookmarkModal} onOpenChange={setShowSaveBookmarkModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

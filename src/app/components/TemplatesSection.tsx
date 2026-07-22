@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button as FloraButton, IconButton, MD, Table, Tag, ToggleButton, ToggleIconButton } from '@zendesk-ui/react-components';
 import { LibraryAssetCard, LIBRARY_CARD_MENU_BTN, type LibraryAssetCardItem } from './LibraryAssetCard';
 import { FloraSearchInput } from './FloraSearchInput';
-import { LibraryFilterSelect, LIBRARY_ASSET_FILTER_OPTIONS, LIBRARY_FILTER_BTN_CLASS, LIBRARY_FILTER_BTN_ICON_CLASS, LIBRARY_FILTER_BTN_LABEL_CLASS } from './LibraryFilterSelect';
+import { LIBRARY_ASSET_FILTER_OPTIONS, LIBRARY_FILTER_BTN_CLASS, LIBRARY_FILTER_BTN_ICON_CLASS, LIBRARY_FILTER_BTN_LABEL_CLASS } from './LibraryFilterSelect';
 import { LibrarySubnavBadge } from './LibrarySubnavBadge';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
@@ -992,6 +992,178 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
     return matchesSearch && matchesCategory && matchesAssetType && matchesNavItem;
   });
 
+  // For the Zendesk curated view, surface the first 3 projects as "Suggested
+  // projects" (rendered above the filters), and show the remaining assets in
+  // the main grid below.
+  const suggestedProjects =
+    activeNavItem === 'zendesk'
+      ? filteredTemplates.filter((t: any) => t.type === 'project').slice(0, 3)
+      : [];
+  const suggestedProjectIds = new Set(suggestedProjects.map((t: any) => t.id));
+  const gridItems =
+    activeNavItem === 'zendesk'
+      ? filteredTemplates.filter((t: any) => !suggestedProjectIds.has(t.id))
+      : filteredTemplates;
+
+  // Renders a single library asset card (used in both the main grid and the
+  // "Suggested projects" row above the filters in the Zendesk curated view).
+  const renderTemplateCard = (template: any) => {
+    const cardItem = toLibraryAssetCardItem(template);
+
+    const openTemplate = () => {
+      if (template.type === 'project') {
+        setOpenedProject(template);
+      } else if (template.type === 'dashboard' && onOpenDashboard) {
+        onOpenDashboard({ id: template.id, title: template.title, type: 'dashboard', data: { isNew: true, fromCard: true, dashboardName: template.title, projectName: template.projectName } });
+      } else if (template.type === 'report' && onOpenDashboard) {
+        onOpenDashboard({ id: template.id, title: template.title, type: 'report', data: { isNew: true, fromCard: true } });
+      }
+    };
+
+    const toggleStar = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (starredIds.has(template.id)) {
+        const newStarred = new Set(starredIds);
+        newStarred.delete(template.id);
+        setStarredIds(newStarred);
+      } else {
+        setStarredIds(new Set([...starredIds, template.id]));
+      }
+    };
+
+    const templateMenu = (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className={LIBRARY_CARD_MENU_BTN}>
+            <MoreVertical className={FLORA_LIBRARY_ICON} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          {template.type === 'project' ? (
+            <>
+              <DropdownMenuItem onClick={toggleStar} className="cursor-pointer">
+                {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowManageAccessModal(true);
+                }}
+                className="cursor-pointer"
+              >
+                Manage access
+              </DropdownMenuItem>
+            </>
+          ) : template.type === 'report' ? (
+            <>
+              <DropdownMenuItem onClick={toggleStar} className="cursor-pointer">
+                {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Share link</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
+            </>
+          ) : template.type === 'dashboard' ? (
+            <>
+              <DropdownMenuItem onClick={toggleStar} className="cursor-pointer">
+                {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Share link</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
+            </>
+          ) : template.type === 'dataset' ? (
+            <>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">View details</DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+
+    if (cardItem) {
+      return (
+        <LibraryAssetCard
+          key={template.id}
+          item={cardItem}
+          onClick={openTemplate}
+          menu={templateMenu}
+        />
+      );
+    }
+
+    return (
+      <Card
+        key={template.id}
+        className="cursor-pointer hover:opacity-80 transition-all relative group h-full flex flex-col"
+        style={{ backgroundColor: '#F7F7F7', border: 'none' }}
+        onClick={openTemplate}
+      >
+        <CardContent className="p-5 flex-1">
+          <div className="flex gap-4 h-full">
+            <div className="flex-1 flex flex-col gap-3 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {template.type === 'dataset' ? (
+                    <DatasetIcon className={FLORA_LIBRARY_ICON} />
+                  ) : (
+                    <Folder className={FLORA_LIBRARY_ICON} />
+                  )}
+                </div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  {templateMenu}
+                </div>
+              </div>
+
+              <h3 className="text-base font-medium text-foreground leading-[21px]">
+                {template.title}
+              </h3>
+
+              {(template.type === 'project' || template.type === 'dataset') && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <UserCircle className={FLORA_LIBRARY_ICON} />
+                    <p className="text-muted-foreground text-xs">
+                      {template.owner || 'Zendesk'}
+                    </p>
+                  </div>
+
+                  {template.type === 'dataset' && template.projectName && (
+                    <div className="flex items-center gap-1.5">
+                      <Folder className={FLORA_LIBRARY_ICON} />
+                      <p className="text-muted-foreground text-xs">
+                        {template.projectName}
+                      </p>
+                    </div>
+                  )}
+
+                  {template.type === 'project' && template.assets && (
+                    <>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <LayoutIcon className={FLORA_LIBRARY_ICON} />
+                        <span>{template.assets.filter((a: any) => a.type === 'dashboard').length}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <BarChartIcon className={FLORA_LIBRARY_ICON} />
+                        <span>{template.assets.filter((a: any) => a.type === 'report').length}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <DatasetIcon className={FLORA_LIBRARY_ICON} />
+                        <span>{template.assets.filter((a: any) => a.type === 'dataset').length}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   // Count templates by type
   const dashboardCount = zendeskTemplates.filter(t => t.type === 'dashboard').length;
   const reportCount = zendeskTemplates.filter(t => t.type === 'report').length;
@@ -1291,12 +1463,6 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                   value={projectSearchQuery}
                   onChange={(event) => setProjectSearchQuery(event.target.value)}
                   width={250}
-                />
-                <LibraryFilterSelect
-                  selected={projectAssetFilter}
-                  onChange={setProjectAssetFilter}
-                  multiSelect={false}
-                  fallbackType="project"
                 />
                 <div className="flex flex-1" />
                 <div className="flex shrink-0 items-center gap-[8px]">
@@ -2138,6 +2304,16 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
             </div>
           )}
 
+          {/* Suggested projects — above the search / filters / view options */}
+          {activeNavItem === 'zendesk' && suggestedProjects.length > 0 && (
+            <div className="mb-8">
+              <h2 className="mb-4 text-base font-medium text-foreground">Suggested projects</h2>
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {suggestedProjects.map((template: any) => renderTemplateCard(template))}
+              </div>
+            </div>
+          )}
+
           {/* New Assets Banner */}
           {activeNavItem === 'trending' && !bannerDismissed && (
             <div className="mb-6 grid grid-cols-2 gap-4">
@@ -2231,11 +2407,6 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 width={250}
-              />
-              <LibraryFilterSelect
-                selected={selectedAssetTypes}
-                onChange={setSelectedAssetTypes}
-                fallbackType="project"
               />
 
               <div className="flex flex-1" />
@@ -2436,201 +2607,20 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
                   <MD tag="span" className={FLORA_TABLE_PRIMARY}>No templates found matching your criteria.</MD>
                 </div>
               ) : viewMode === 'grid' ? (
-            <div className={`grid gap-4 ${
-              activeNavItem === 'created-by-me' ||
-              activeNavItem === 'shared-with-me' ||
-              activeNavItem === 'archived'
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3'
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-            }`}>
-              {filteredTemplates.map((template: any) => {
-                const cardItem = toLibraryAssetCardItem(template);
-
-                const openTemplate = () => {
-                  if (template.type === 'project') {
-                    setOpenedProject(template);
-                  } else if (template.type === 'dashboard' && onOpenDashboard) {
-                    onOpenDashboard({ id: template.id, title: template.title, type: 'dashboard', data: { isNew: true, fromCard: true, dashboardName: template.title, projectName: template.projectName } });
-                  } else if (template.type === 'report' && onOpenDashboard) {
-                    onOpenDashboard({ id: template.id, title: template.title, type: 'report', data: { isNew: true, fromCard: true } });
-                  }
-                };
-
-                const templateMenu = (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className={LIBRARY_CARD_MENU_BTN}>
-                        <MoreVertical className={FLORA_LIBRARY_ICON} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      {template.type === 'project' ? (
-                        <>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (starredIds.has(template.id)) {
-                                const newStarred = new Set(starredIds);
-                                newStarred.delete(template.id);
-                                setStarredIds(newStarred);
-                              } else {
-                                setStarredIds(new Set([...starredIds, template.id]));
-                              }
-                            }}
-                            className="cursor-pointer"
-                          >
-                            {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowManageAccessModal(true);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            Manage access
-                          </DropdownMenuItem>
-                        </>
-                      ) : template.type === 'report' ? (
-                        <>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (starredIds.has(template.id)) {
-                                const newStarred = new Set(starredIds);
-                                newStarred.delete(template.id);
-                                setStarredIds(newStarred);
-                              } else {
-                                setStarredIds(new Set([...starredIds, template.id]));
-                              }
-                            }}
-                            className="cursor-pointer"
-                          >
-                            {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Pin to watchlist</DropdownMenuItem>
-                        </>
-                      ) : template.type === 'dashboard' ? (
-                        <>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (starredIds.has(template.id)) {
-                                const newStarred = new Set(starredIds);
-                                newStarred.delete(template.id);
-                                setStarredIds(newStarred);
-                              } else {
-                                setStarredIds(new Set([...starredIds, template.id]));
-                              }
-                            }}
-                            className="cursor-pointer"
-                          >
-                            {starredIds.has(template.id) ? 'Remove from starred' : 'Add to starred'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Archive</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
-                        </>
-                      ) : template.type === 'dataset' ? (
-                        <>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">View details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => e.stopPropagation()} className="cursor-pointer">Export</DropdownMenuItem>
-                        </>
-                      ) : null}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                );
-
-                if (cardItem) {
-                  return (
-                    <LibraryAssetCard
-                      key={template.id}
-                      item={cardItem}
-                      onClick={openTemplate}
-                      menu={templateMenu}
-                    />
-                  );
-                }
-
-                return (
-<Card
-                  key={template.id}
-                  className="cursor-pointer hover:opacity-80 transition-all relative group h-full flex flex-col"
-                  style={{ backgroundColor: '#F7F7F7', border: 'none' }}
-                  onClick={openTemplate}
-                >
-                  <CardContent className="p-5 flex-1">
-                    <div className="flex gap-4 h-full">
-                      {/* Left side - Content */}
-                      <div className="flex-1 flex flex-col gap-3 min-w-0">
-                        {/* Icon */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            {template.type === 'dataset' ? (
-                              <DatasetIcon className={FLORA_LIBRARY_ICON} />
-                            ) : (
-                              <Folder className={FLORA_LIBRARY_ICON} />
-                            )}
-                          </div>
-                          <div onClick={(e) => e.stopPropagation()}>
-                            {templateMenu}
-                          </div>
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-base font-medium text-foreground leading-[21px]">
-                          {template.title}
-                        </h3>
-
-                        {/* Compact layout for projects and datasets - all in one row */}
-                        {(template.type === 'project' || template.type === 'dataset') && (
-                          <div className="flex items-center gap-3">
-                            {/* Owner */}
-                            <div className="flex items-center gap-1.5">
-                              <UserCircle className={FLORA_LIBRARY_ICON} />
-                              <p className="text-muted-foreground text-xs">
-                                {template.owner || 'Zendesk'}
-                              </p>
-                            </div>
-
-                            {/* Project Name (for datasets) */}
-                            {template.type === 'dataset' && template.projectName && (
-                              <div className="flex items-center gap-1.5">
-                                <Folder className={FLORA_LIBRARY_ICON} />
-                                <p className="text-muted-foreground text-xs">
-                                  {template.projectName}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Project stats (for projects) */}
-                            {template.type === 'project' && template.assets && (
-                              <>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <LayoutIcon className={FLORA_LIBRARY_ICON} />
-                                  <span>{template.assets.filter((a: any) => a.type === 'dashboard').length}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <BarChartIcon className={FLORA_LIBRARY_ICON} />
-                                  <span>{template.assets.filter((a: any) => a.type === 'report').length}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                  <DatasetIcon className={FLORA_LIBRARY_ICON} />
-                                  <span>{template.assets.filter((a: any) => a.type === 'dataset').length}</span>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-              })}
-            </div>
+            <>
+              {activeNavItem === 'zendesk' && suggestedProjects.length > 0 && (
+                <h2 className="mb-4 text-base font-medium text-foreground">All assets</h2>
+              )}
+              <div className={`grid gap-4 ${
+                activeNavItem === 'created-by-me' ||
+                activeNavItem === 'shared-with-me' ||
+                activeNavItem === 'archived'
+                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              }`}>
+                {gridItems.map((template: any) => renderTemplateCard(template))}
+              </div>
+            </>
           ) : (
             <Table size="small">
               <Table.Head>

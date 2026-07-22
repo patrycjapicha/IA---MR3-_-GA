@@ -312,6 +312,10 @@ html {
 .dashboard-tab-bar [data-garden-id='tabs.tab'] {
   display: inline-flex;
   align-items: center;
+  font-size: 12px !important;
+  line-height: 16px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
   border-top: none !important;
   border-left: none !important;
   border-right: none !important;
@@ -373,7 +377,21 @@ html {
   height: 12px !important;
 }
 
-.dashboard-filter-panel-tabs [data-garden-id='tabs.tablist'] {
+/* Split-button dropdowns size to their tiny chevron trigger, collapsing the
+   menu to ~10px and wrapping item labels one character per line. Give the
+   floating menu a sensible min-width and keep items on a single line. */
+.flora-split-button-menu {
+  min-width: 160px !important;
+  width: max-content !important;
+}
+
+.flora-split-button-menu [data-garden-id='dropdowns.menu.item'],
+.flora-split-button-menu [data-garden-id='dropdowns.menu.item'] span {
+  white-space: nowrap;
+}
+
+.dashboard-filter-panel-tabs,
+.dashboard-filter-panel-tabs[data-garden-id='tabs.tablist'] {
   display: flex !important;
   align-items: center;
   gap: 24px;
@@ -382,7 +400,8 @@ html {
   border-bottom: 1px solid #eae9e8;
 }
 
-.dashboard-filter-panel-tabs [data-garden-id='tabs.tab'] {
+.dashboard-filter-panel-tabs [data-garden-id='tabs.tab'],
+.dashboard-filter-panel-tabs > [data-garden-id='tabs.tab'] {
   padding: 12px 0 !important;
   border-top: none !important;
   border-left: none !important;
@@ -393,7 +412,8 @@ html {
   background: transparent !important;
 }
 
-.dashboard-filter-panel-tabs [data-garden-id='tabs.tab'][aria-selected='true'] {
+.dashboard-filter-panel-tabs [data-garden-id='tabs.tab'][aria-selected='true'],
+.dashboard-filter-panel-tabs > [data-garden-id='tabs.tab'][aria-selected='true'] {
   border-bottom-color: #406cc4 !important;
   color: #406cc4 !important;
 }
@@ -403,6 +423,10 @@ html {
   flex-direction: column;
   gap: 12px;
   padding: 0 16px;
+}
+
+.dashboard-filter-panel-search {
+  padding-top: 16px;
 }
 
 .dashboard-filter-panel-search [data-garden-id='fields.field'] {

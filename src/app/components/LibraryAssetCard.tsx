@@ -26,13 +26,34 @@ type LibraryAssetCardProps = {
   menu?: ReactNode;
 };
 
-function MetaRow({ icon, label }: { icon: ReactNode; label: string }) {
+function MetaRow({ icon, label, title }: { icon: ReactNode; label: string; title?: string }) {
   return (
     <div className="flex h-[16.5px] min-w-0 items-center gap-[5.25px]">
       {icon}
-      <span className="truncate text-[11px] leading-[16.5px] text-[#68737d]">{label}</span>
+      <span className="truncate text-[11px] leading-[16.5px] text-[#68737d]" title={title}>{label}</span>
     </div>
   );
+}
+
+// Format an absolute date string (e.g. "Feb 6, 2026 2:20 PM") as a relative
+// "5 days ago" label. Falls back to the original string if it can't be parsed.
+function relativeTime(value?: string): string {
+  if (!value) return 'Recently updated';
+  const then = new Date(value).getTime();
+  if (Number.isNaN(then)) return value;
+  const diffMs = Date.now() - then;
+  const sec = Math.round(diffMs / 1000);
+  const min = Math.round(sec / 60);
+  const hr = Math.round(min / 60);
+  const day = Math.round(hr / 24);
+  const month = Math.round(day / 30);
+  const year = Math.round(day / 365);
+  if (sec < 60) return 'just now';
+  if (min < 60) return `${min} minute${min === 1 ? '' : 's'} ago`;
+  if (hr < 24) return `${hr} hour${hr === 1 ? '' : 's'} ago`;
+  if (day < 30) return `${day} day${day === 1 ? '' : 's'} ago`;
+  if (month < 12) return `${month} month${month === 1 ? '' : 's'} ago`;
+  return `${year} year${year === 1 ? '' : 's'} ago`;
 }
 
 export function LibraryAssetCard({ item, onClick, menu }: LibraryAssetCardProps) {
@@ -68,14 +89,21 @@ export function LibraryAssetCard({ item, onClick, menu }: LibraryAssetCardProps)
           {item.title}
         </h3>
 
-        <MetaRow
-          icon={<UserCircle className={FLORA_CARD_ICON} />}
-          label={item.owner || 'Zendesk'}
-        />
-        <MetaRow
-          icon={<Clock className={FLORA_CARD_ICON} />}
-          label={item.lastUpdated || 'Recently updated'}
-        />
+        <div className="flex h-[16.5px] min-w-0 items-center gap-[10.5px]">
+          <div className="flex min-w-0 items-center gap-[5.25px]">
+            <UserCircle className={FLORA_CARD_ICON} />
+            <span className="truncate text-[11px] leading-[16.5px] text-[#68737d]">{item.owner || 'Zendesk'}</span>
+          </div>
+          <div className="flex shrink-0 items-center gap-[5.25px]">
+            <Clock className={FLORA_CARD_ICON} />
+            <span
+              className="whitespace-nowrap text-[11px] leading-[16.5px] text-[#68737d]"
+              title={`Last updated${item.lastUpdated ? `: ${item.lastUpdated}` : ''}`}
+            >
+              {relativeTime(item.lastUpdated)}
+            </span>
+          </div>
+        </div>
         <MetaRow
           icon={<Folder className={FLORA_CARD_ICON} />}
           label={item.projectName || 'Uncategorized'}
