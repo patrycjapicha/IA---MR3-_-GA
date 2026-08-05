@@ -12,6 +12,7 @@ import BarChartIcon from '@zendesk-ui/assets/icons/20px/bar-chart-fill.svg?react
 import BarChart3Icon from '@zendesk-ui/assets/icons/20px/bar-chart-fill.svg?react';
 import BarChart3StrokeIcon from '@zendesk-ui/assets/icons/20px/bar-chart-stroke.svg?react';
 import BellIcon from '@zendesk-ui/assets/icons/20px/bell-fill.svg?react';
+import BellStrokeIcon from '@zendesk-ui/assets/icons/20px/bell-stroke.svg?react';
 import BookIcon from '@zendesk-ui/assets/icons/20px/book-closed-fill.svg?react';
 import BookOpenIcon from '@zendesk-ui/assets/icons/20px/book-open-fill.svg?react';
 import BookmarkIcon from '@zendesk-ui/assets/icons/20px/bookmark-fill.svg?react';
@@ -25,6 +26,7 @@ import CheckIconSrc from '@zendesk-ui/assets/icons/20px/check.svg?react';
 import CheckCircleIcon from '@zendesk-ui/assets/icons/20px/check-circle-fill.svg?react';
 import CheckSquareIcon from '@zendesk-ui/assets/icons/20px/check-square-fill.svg?react';
 import CheckSquareStrokeIcon from '@zendesk-ui/assets/icons/20px/check-square-stroke.svg?react';
+import ChevronSquareStrokeIcon from '@zendesk-ui/assets/icons/20px/chevron-square-stroke.svg?react';
 import ChevronDownIconSrc from '@zendesk-ui/assets/icons/20px/chevron-down.svg?react';
 import ChevronLeftIconSrc from '@zendesk-ui/assets/icons/20px/chevron-left.svg?react';
 import ChevronRightIconSrc from '@zendesk-ui/assets/icons/20px/chevron-right.svg?react';
@@ -78,6 +80,7 @@ import HistoryIcon from '@zendesk-ui/assets/icons/20px/history-fill.svg?react';
 import HistoryStrokeIcon from '@zendesk-ui/assets/icons/20px/history-stroke.svg?react';
 import HomeIcon from '@zendesk-ui/assets/icons/20px/home-fill.svg?react';
 import InfoIcon from '@zendesk-ui/assets/icons/20px/info-circle-fill.svg?react';
+import InfoStrokeIcon from '@zendesk-ui/assets/icons/20px/info-circle-stroke.svg?react';
 import LayersIcon from '@zendesk-ui/assets/icons/20px/layout-grid-fill.svg?react';
 import LayoutIcon from '@zendesk-ui/assets/icons/20px/layout-grid-fill.svg?react';
 import LayoutStrokeIcon from '@zendesk-ui/assets/icons/20px/layout-grid-stroke.svg?react';
@@ -113,6 +116,7 @@ import SendIcon from '@zendesk-ui/assets/icons/20px/paper-plane-fill.svg?react';
 import SettingsIconSrc from '@zendesk-ui/assets/icons/20px/gear-fill.svg?react';
 import GearStrokeIcon from '@zendesk-ui/assets/icons/20px/gear-stroke.svg?react';
 import ShareIcon from '@zendesk-ui/assets/icons/20px/share-fill.svg?react';
+import ShareStrokeIcon from '@zendesk-ui/assets/icons/20px/share-stroke.svg?react';
 import Share2Icon from '@zendesk-ui/assets/icons/20px/share-fill.svg?react';
 import ShieldIcon from '@zendesk-ui/assets/icons/20px/lock-fill.svg?react';
 import SlidersHorizontalIcon from '@zendesk-ui/assets/icons/20px/slider-fill.svg?react';
@@ -172,6 +176,19 @@ const EyeFillIcon = (props: SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+const EyeStrokeIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" focusable="false" viewBox="0 0 20 20" fill="none" {...props}>
+    <path
+      d="M1.25 10C2.665 6.317 6.024 3.75 10 3.75s7.335 2.567 8.75 6.25c-1.415 3.683-4.774 6.25-8.75 6.25S2.665 13.683 1.25 10Z"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx={10} cy={10} r={2.75} stroke="currentColor" strokeWidth={1.5} />
+  </svg>
+);
+
 const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
   <ArrowLeftIcon {...props} style={{ transform: 'scaleX(-1)', ...props.style }} />
 );
@@ -209,6 +226,7 @@ export const BarChart = BarChartIcon;
 export const BarChart3 = BarChart3Icon;
 export const BarChart3Stroke = BarChart3StrokeIcon;
 export const Bell = BellIcon;
+export const BellStroke = BellStrokeIcon;
 export const Book = BookIcon;
 export const BookOpen = BookOpenIcon;
 export const Bookmark = BookmarkIcon;
@@ -222,6 +240,7 @@ export const Check = CheckIconSrc;
 export const CheckCircle = CheckCircleIcon;
 export const CheckSquare = CheckSquareIcon;
 export const CheckSquareStroke = CheckSquareStrokeIcon;
+export const ChevronSquareStroke = ChevronSquareStrokeIcon;
 export const ChevronDown = ChevronDownIconSrc;
 export const ChevronLeft = ChevronLeftIconSrc;
 export const ChevronRight = ChevronRightIconSrc;
@@ -246,7 +265,7 @@ export const Edit3 = Edit3Icon;
 export const PencilSparkleStroke = PencilSparkleStrokeIcon;
 export const ExternalLink = ExternalLinkIcon;
 export const Eye = EyeFillIcon;
-export const EyeStroke = MonitorStrokeIcon;
+export const EyeStroke = EyeStrokeIcon;
 export const EyeOff = EyeOffIcon;
 export const FileBarChart = FileBarChartIcon;
 export const FileSpreadsheet = FileSpreadsheetIcon;
@@ -271,6 +290,7 @@ export const Home = HomeIcon;
 export const Image = ImageIcon;
 export const ImageStroke = ImageStrokeIcon;
 export const Info = InfoIcon;
+export const InfoStroke = InfoStrokeIcon;
 export const Layers = LayersIcon;
 export const Layout = LayoutIcon;
 export const LayoutStroke = LayoutStrokeIcon;
@@ -336,6 +356,7 @@ export const Settings = SettingsIconSrc;
 export const SettingsIcon = SettingsIconSrc;
 export const GearStroke = GearStrokeIcon;
 export const Share = ShareIcon;
+export const ShareStroke = ShareStrokeIcon;
 export const Share2 = Share2Icon;
 export const Shield = ShieldIcon;
 export const SlidersHorizontal = SlidersHorizontalIcon;
