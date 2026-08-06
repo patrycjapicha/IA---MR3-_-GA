@@ -95,6 +95,10 @@ interface TemplatesSectionProps {
   onOpenDashboard?: (dashboardData: { id: string; title: string; data?: any; type?: string }) => void;
   isNavCollapsed?: boolean;
   setIsNavCollapsed?: (collapsed: boolean) => void;
+  // Title of a project to open straight away (e.g. arriving from a dashboard's
+  // location menu). Cleared through onInitialProjectOpened once handled.
+  initialProjectName?: string;
+  onInitialProjectOpened?: () => void;
 }
 
 // Zendesk pre-created templates
@@ -891,7 +895,20 @@ const categories = [
   'Self-Service'
 ];
 
-export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNavCollapsed, setIsNavCollapsed: externalSetIsNavCollapsed }: TemplatesSectionProps) {
+// Look a project up by the name shown in a breadcrumb / location menu. Falls back
+// to an empty project so an unknown folder name still opens a valid detail view.
+const findProjectByTitle = (title: string) => {
+  const all = [
+    ...zendeskTemplates.filter(t => t.type === 'project'),
+    ...createdByMeProjects,
+    ...sharedWithMeProjects,
+  ];
+  return (
+    all.find(p => p.title.toLowerCase() === title.toLowerCase()) ?? { title, assets: [] as any[] }
+  );
+};
+
+export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNavCollapsed, setIsNavCollapsed: externalSetIsNavCollapsed, initialProjectName, onInitialProjectOpened }: TemplatesSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -903,7 +920,9 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
   const [selectedAssetTypes, setSelectedAssetTypes] = useState<Set<string>>(new Set(['project', 'dashboard', 'report']));
   const [sortBy, setSortBy] = useState<'date-created' | 'date-modified' | 'name'>('date-modified');
   const [starredExpanded, setStarredExpanded] = useState(true);
-  const [openedProject, setOpenedProject] = useState<any>(null);
+  const [openedProject, setOpenedProject] = useState<any>(
+    initialProjectName ? findProjectByTitle(initialProjectName) : null
+  );
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [projectAssetFilter, setProjectAssetFilter] = useState<Set<string>>(new Set(['project', 'dashboard', 'report', 'dataset']));
@@ -924,6 +943,14 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
   // Use external collapse state if provided, otherwise use internal state
   const isCollapsed = externalIsNavCollapsed !== undefined ? externalIsNavCollapsed : sidebarCollapsed;
   const setIsCollapsed = externalSetIsNavCollapsed || setSidebarCollapsed;
+
+  // Open the requested project when arriving from elsewhere (e.g. a dashboard's
+  // location menu), then let the parent drop the request so back navigation works.
+  useEffect(() => {
+    if (!initialProjectName) return;
+    setOpenedProject(findProjectByTitle(initialProjectName));
+    onInitialProjectOpened?.();
+  }, [initialProjectName]);
 
   // Update viewMode based on activeNavItem
   useEffect(() => {

@@ -21,6 +21,8 @@ import {
 import {
   BarChart3Stroke as BarChartIcon,
   TextStroke,
+  // recharts exports its own `Line`, so the Flora rule glyph gets a distinct name.
+  Line as LineRule,
   Link,
   LayoutStroke,
   ImageStroke,
@@ -32,7 +34,6 @@ import {
   Edit2Stroke as Edit2,
   UndoReturn,
   RedoReturn,
-  RefreshCw,
   Redo2,
   PlayStroke as Play,
   PauseStroke as Pause,
@@ -47,6 +48,7 @@ import {
   SaveStroke as Save,
   FilterStroke as Filter,
   FolderStroke as Folder,
+  NestedInParent,
   PersonStroke as UserCircle,
   Plus,
   X,
@@ -75,11 +77,17 @@ import {
   ShareStroke,
   BellStroke,
   InfoStroke,
+  Star,
+  StarStroke,
+  ArrowRotateRight,
+  TerminalStroke,
 } from '@/components/icons/flora';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -100,6 +108,8 @@ import {
   AreaChart as RechartsAreaChart,
   Area,
 } from 'recharts';
+import { ServiceOpsChart, isServiceOpsChart, isServiceOpsChromeless } from './dashboard/service-ops';
+import { MonitoringChart, isMonitoringChart, isMonitoringChromeless } from './dashboard/monitoring-ops';
 
 const FLORA_ICON = 'size-[16px] shrink-0 text-muted-foreground';
 const FLORA_TOOLBAR_ICON = 'size-[16px] shrink-0 text-muted-foreground';
@@ -107,6 +117,11 @@ const FLORA_LIBRARY_ICON = 'size-[16px] shrink-0 fill-current !text-muted-foregr
 const FLORA_TABLE_PRIMARY = 'm-0';
 const FLORA_TAB_ADD_ICON = '!size-[16px] shrink-0';
 const FLORA_MENU_ICON = FLORA_ICON;
+// Matches Flora's own menu group title (the "Create new" header on the Create
+// menu): 14px semibold foreground on a 20px line. leading is in px because the
+// 14px root font size makes leading-5 resolve to 17.5px. Padding follows this
+// menu's own items so the title shares their left edge.
+const FLORA_MENU_TITLE = '!px-3 !py-2 !text-base !font-semibold !leading-[20px] !text-foreground';
 const FLORA_HEADER_ICON = '!size-[16px] shrink-0 text-muted-foreground';
 const FLORA_DANGER_ICON = 'size-[16px] shrink-0';
 const FLORA_BTN = '!rounded-[4px] text-base h-8 font-normal';
@@ -165,26 +180,6 @@ const CROSS_FILTER_SETTINGS: {
   },
 ];
 
-// Custom "</>" code glyph — Flora has no dedicated code icon.
-function CodeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return (
-    <svg
-      className={className}
-      style={style}
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M7 6l-4 4 4 4" />
-      <path d="M13 6l4 4-4 4" />
-      <path d="M11 4.5l-2 11" />
-    </svg>
-  );
-}
 const REPORTS_MODAL_LIST_CLASS =
   'dashboard-reports-modal-list max-h-[360px] overflow-x-hidden overflow-y-auto rounded-[4px] border border-[#dcdcda] [scrollbar-gutter:stable]';
 
@@ -556,8 +551,10 @@ function WidgetStyleMenu({ style, onChange, dark }: { style: any; onChange: (pat
   );
 }
 const FILTER_ACTIVE_VISIBLE_TAGS = 2;
+// h-[32px] in px, not h-8 — the 14px root font size makes 2rem resolve to 28px,
+// which would sit 4px shorter than the saved-views and refresh-rate controls.
 const FILTER_ACTIVE_SHELL =
-  'inline-flex h-8 w-fit max-w-[360px] items-center gap-1 rounded-[8px] border border-[#dcdcda] bg-white pl-3 pr-2';
+  'inline-flex h-[32px] w-fit max-w-[360px] items-center gap-1 rounded-[8px] border border-[#dcdcda] bg-white pl-3 pr-2';
 const FILTER_ACTIVE_LABEL =
   'shrink-0 whitespace-nowrap !text-[12px] !font-semibold !leading-4 !text-[#2f3130]';
 const FILTER_ACTIVE_VALUES =
@@ -620,6 +617,8 @@ interface DashboardBuilderProps {
   isFromCard?: boolean; // Flag to indicate if opened from a card
   initialData?: any; // Initial data for the dashboard
   onOpenAnalyticsAssistant?: (query: string, showResponse: boolean, responseType?: 'default' | 'narrate') => void;
+  // Leave the builder and open the given project in the library
+  onNavigateToProject?: (projectName: string) => void;
 }
 
 const toolbarItems = [
@@ -627,6 +626,7 @@ const toolbarItems = [
     id: 'chart',
     type: 'chart' as const,
     label: 'Report',
+    shortcut: 'R',
     icon: <BarChartIcon className={FLORA_TOOLBAR_ICON} />,
     description: 'Add a report'
   },
@@ -634,6 +634,7 @@ const toolbarItems = [
     id: 'text',
     type: 'text' as const,
     label: 'Text',
+    shortcut: 'T',
     icon: <TextStroke className={FLORA_TOOLBAR_ICON} />,
     description: 'Add text content'
   },
@@ -641,54 +642,63 @@ const toolbarItems = [
     id: 'image',
     type: 'image' as const,
     label: 'Image',
+    shortcut: 'I',
     icon: <ImageStroke className={FLORA_TOOLBAR_ICON} />,
     description: 'Add images'
-  },
-  {
-    id: 'elements',
-    type: 'elements' as const,
-    label: 'Elements',
-    icon: <StopStroke className={FLORA_TOOLBAR_ICON} />,
-    description: 'Add a section or separator',
-    isDropdown: true,
-    children: [
-      {
-        id: 'section',
-        type: 'section' as const,
-        label: 'Section',
-        icon: <StopStroke className={FLORA_ICON} />,
-        description: 'Add a section'
-      },
-      {
-        id: 'separator',
-        type: 'separator' as const,
-        label: 'Separator',
-        icon: (
-          <svg className={FLORA_ICON} viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <line x1="3" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        ),
-        description: 'Add a divider line'
-      },
-    ],
-  },
-  {
-    id: 'parameter',
-    type: 'parameter' as const,
-    label: 'Parameter',
-    icon: <ShapesStroke className={FLORA_TOOLBAR_ICON} />,
-    description: 'Coming soon',
-    disabled: true
   },
   {
     id: 'narrative',
     type: 'narrative' as const,
     label: 'AI summary',
+    shortcut: 'A',
     icon: <PencilSparkleStroke className={FLORA_TOOLBAR_ICON} />,
     description: 'Coming soon',
     disabled: true
   }
 ];
+
+// The less-used insert tools live behind the toolbar's overflow menu so the
+// row keeps to the widgets people reach for on every dashboard.
+const toolbarOverflowItems = [
+  {
+    id: 'section',
+    label: 'Section',
+    shortcut: 'S',
+    icon: <StopStroke className={FLORA_ICON} />,
+  },
+  {
+    id: 'separator',
+    label: 'Line',
+    shortcut: 'L',
+    icon: <LineRule className={FLORA_ICON} />,
+  },
+  {
+    id: 'parameter',
+    label: 'Parameter',
+    shortcut: 'P',
+    icon: <ShapesStroke className={FLORA_ICON} />,
+    disabled: true,
+  },
+  {
+    id: 'fetch',
+    label: 'Fetch',
+    shortcut: 'F',
+    icon: <Download className={FLORA_ICON} />,
+    disabled: true,
+  },
+];
+
+// Tooltip body for a toolbar tool: the name, then its single-letter keyboard
+// shortcut set off to the right the way Flora tooltips carry hint text.
+function toolTooltip(label: string, shortcut?: string) {
+  if (!shortcut) return label;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{label}</span>
+      <span className="text-white/60">{shortcut}</span>
+    </span>
+  );
+}
 
 const chartTypes = [
   {
@@ -864,6 +874,1038 @@ function createDefaultLinkContent(): LinkContent {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Prepopulated layout for a dashboard opened from the library
+// ---------------------------------------------------------------------------
+// Laid out on a 12-column grid across the full canvas width so the result reads
+// like a purpose-built data app rather than a scatter of widgets: each band is a
+// titled section panel holding its own charts, introduced by a heading + caption
+// and closed by a row of links out to related assets.
+const LIB_CANVAS_W = 1627; // measured canvas width at the default viewport
+const LIB_M = 24; // outer margin
+const LIB_GAP = 16; // gutter between columns / rows
+const LIB_COLS = 12;
+const LIB_CONTENT_W = LIB_CANVAS_W - LIB_M * 2;
+const LIB_COL_W = (LIB_CONTENT_W - LIB_GAP * (LIB_COLS - 1)) / LIB_COLS;
+
+// Width/x for a span of `n` columns starting at column `c` (both 0-indexed).
+const libSpan = (n: number) => Math.round(LIB_COL_W * n + LIB_GAP * (n - 1));
+const libX = (c: number) => Math.round(LIB_M + (LIB_COL_W + LIB_GAP) * c);
+
+// Headings carry their rank by size, not by weight. Semibold at these sizes
+// shouts; medium reads as a heading and still lets the body text beside it stay
+// legible, so `fontWeight` defaults to 500 rather than bold.
+const libHeading = (
+  id: string,
+  text: string,
+  { x, y, w, h, fontSize = 22, bold = false, fontWeight, color = '#2f3941' }:
+    { x: number; y: number; w: number; h?: number; fontSize?: number; bold?: boolean; fontWeight?: number; color?: string }
+): ContentItem => ({
+  id,
+  type: 'text',
+  position: { x, y },
+  size: { width: w, height: h ?? fontSize + 20 },
+  // Headings sit directly on the canvas: no card chrome behind the type.
+  content: {
+    text,
+    align: 'left',
+    bold,
+    fontSize,
+    fontWeight,
+    color,
+    link: null,
+    // Text boxes only honour their height once `resized` is set; anything that
+    // wraps onto more than one line needs it, or the extra lines get clipped.
+    style: { shadow: false, border: false, bgColor: 'transparent', resized: h !== undefined },
+  },
+});
+
+// A panel that visually groups the widgets placed on top of it. Each section of
+// the dashboard gets its own light tint so the bands are easy to scan; the cards
+// on top stay white, which keeps every chart on a clean, readable surface.
+const libPanel = (
+  id: string,
+  { x, y, w, h, bg = '#ffffff', border = '#e9ebed' }:
+    { x: number; y: number; w: number; h: number; bg?: string; border?: string }
+): ContentItem => ({
+  id,
+  type: 'section',
+  position: { x, y },
+  size: { width: w, height: h },
+  content: {
+    style: { shadow: false, border: true, borderColor: border, borderWidth: 1, bgColor: bg },
+  },
+});
+
+const libLink = (
+  id: string,
+  label: string,
+  { x, y, w, assetName }: { x: number; y: number; w: number; assetName: string }
+): ContentItem => ({
+  id,
+  type: 'link',
+  position: { x, y },
+  size: { width: w, height: 28 },
+  content: {
+    ...createDefaultLinkContent(),
+    label,
+    linkType: 'asset',
+    assetId: id,
+    assetName,
+    passState: 'filters',
+    format: { ...createDefaultLinkContent().format, fontSize: 14 },
+  },
+});
+
+// A card sitting on a tinted section panel. It has no surface or ring of its own:
+// the section tint shows through, so a band reads as one area rather than as a
+// tray of separate boxes. Spacing and the widget's own heading do the separating.
+const libChart = (
+  id: string,
+  title: string,
+  { x, y, w, h }: { x: number; y: number; w: number; h: number },
+  content: Record<string, any>,
+  { bg = 'transparent', border = false, borderColor = '#e4e6e8' }:
+    { bg?: string; border?: boolean; borderColor?: string } = {}
+): ContentItem => ({
+  id,
+  type: 'chart',
+  title,
+  position: { x, y },
+  size: { width: w, height: h },
+  content: { ...content, style: { shadow: false, border, borderColor, borderWidth: 1, bgColor: bg } },
+});
+
+// Each section gets a light tint plus a saturated accent used for its heading
+// strip. The tints stay near-white so the white cards on top still separate from
+// them, and every accent is only ever a reinforcement — headings, labels, icons
+// and trend arrows carry the meaning on their own.
+const SO_SECTIONS = {
+  summary: { bg: '#f4f7fb', border: '#dbe6f3', accent: '#1f4f8f' },
+  demand: { bg: '#f7f5fc', border: '#e4dcf3', accent: '#5b4bc4' },
+  service: { bg: '#fdf8f1', border: '#f2e5cf', accent: '#a8641b' },
+  experience: { bg: '#f3faf7', border: '#d6ebe3', accent: '#12775b' },
+  teams: { bg: '#f5f6fa', border: '#e0e3ee', accent: '#3f4a7e' },
+};
+
+// Vertical rhythm — generous, so the bands read as separate areas.
+const SO_SECTION_GAP = 40;
+const SO_PAD = 24; // inset from a section panel's edge to the cards on it
+// Space below the last card in a section, before the panel's bottom edge. Larger
+// than the top inset so each band has visible room to breathe under its content.
+const SO_PAD_BOTTOM = 40;
+// Heading block that sits inside a section panel: title, blurb, and the gap down
+// to the first card.
+const SO_HEADER_H = 82;
+
+// Cards sit directly on the section tint rather than on their own white surface,
+// so a section reads as one area instead of a tray of boxes.
+const SO_CARD_CHROME = { bg: 'transparent', border: false } as const;
+
+// The dark band the dashboard opens on. Its copy is white, so it is kept apart
+// from the section tints below it.
+const SO_HERO_BG = '#284173';
+const SO_HERO_TEXT = '#ffffff';
+const SO_HERO_TEXT_MUTED = '#dfe7f4';
+
+// Cards live inside a section panel, inset from its edges, so they run on their
+// own 12-column grid measured from the panel's inner width rather than the page.
+const SO_INNER_W = libSpan(12) - SO_PAD * 2;
+const SO_INNER_COL = (SO_INNER_W - LIB_GAP * (LIB_COLS - 1)) / LIB_COLS;
+const soIn = (n: number) => Math.round(SO_INNER_COL * n + LIB_GAP * (n - 1));
+const soInX = (c: number) => Math.round(libX(0) + SO_PAD + (SO_INNER_COL + LIB_GAP) * c);
+
+// A section: one tinted panel that carries its own heading and every card in it,
+// so the title reads as part of the section rather than floating above it.
+function soSection(
+  key: string,
+  { y, title, blurb, bg, border, bodyH }:
+    { y: number; title: string; blurb: string; bg: string; border: string; bodyH: number }
+): { items: ContentItem[]; bodyY: number; height: number } {
+  const height = SO_PAD + SO_HEADER_H + bodyH + SO_PAD_BOTTOM;
+  return {
+    items: [
+      libPanel(`so-${key}-panel`, { x: libX(0), y, w: libSpan(12), h: height, bg, border }),
+      libHeading(`so-${key}-title`, title, {
+        x: libX(0) + SO_PAD,
+        y: y + SO_PAD,
+        w: libSpan(9),
+        fontSize: 20,
+        fontWeight: 500,
+        color: '#1f2933',
+      }),
+      libHeading(`so-${key}-blurb`, blurb, {
+        x: libX(0) + SO_PAD,
+        y: y + SO_PAD + 34,
+        w: libSpan(10),
+        h: 26,
+        fontSize: 14,
+        bold: false,
+        color: '#68737d',
+      }),
+    ],
+    bodyY: y + SO_PAD + SO_HEADER_H,
+    height,
+  };
+}
+
+function createLibraryDashboardItems(): ContentItem[] {
+  const items: ContentItem[] = [];
+  let y = LIB_M;
+
+  // ---- Hero ---------------------------------------------------------------
+  // Full-width dark band: headline, reporting period, and a short intro, all in
+  // white. The global filter bar lives in the toolbar above the canvas, so it
+  // isn't duplicated here — one filter row scopes everything below it.
+  const heroH = 182;
+  items.push(
+    libPanel('so-hero-panel', {
+      x: libX(0),
+      y,
+      w: libSpan(12),
+      h: heroH,
+      bg: SO_HERO_BG,
+      border: SO_HERO_BG,
+    })
+  );
+  items.push(
+    libHeading('so-hero-eyebrow', 'Executive service review · Q3 2026', {
+      x: libX(0) + SO_PAD + 8,
+      y: y + SO_PAD + 4,
+      w: libSpan(6),
+      fontSize: 14,
+      fontWeight: 500,
+      color: SO_HERO_TEXT_MUTED,
+    })
+  );
+  items.push(
+    libHeading('so-hero-title', 'Support is getting faster while demand shifts to chat', {
+      x: libX(0) + SO_PAD + 8,
+      y: y + SO_PAD + 28,
+      w: libSpan(8),
+      fontSize: 32,
+      fontWeight: 500,
+      color: SO_HERO_TEXT,
+    })
+  );
+  items.push(
+    libHeading(
+      'so-hero-intro',
+      'Weeks 27–32 (6 Jul – 16 Aug 2026) across all channels, brands and regions. Resolution time and satisfaction both improved; urgent-priority SLA and the Escalations queue are the two areas that need a decision this quarter.',
+      {
+        x: libX(0) + SO_PAD + 8,
+        y: y + SO_PAD + 80,
+        w: libSpan(8),
+        h: 68, // two wrapped lines — without an explicit height the copy is clipped
+        fontSize: 15,
+        bold: false,
+        color: SO_HERO_TEXT_MUTED,
+      }
+    )
+  );
+  items.push(
+    libHeading('so-hero-meta', 'Reporting period\nWk 27 – Wk 32 2026\n\nCompared with\nWk 21 – Wk 26 2026', {
+      x: libX(9),
+      y: y + SO_PAD + 20,
+      w: libSpan(3) - SO_PAD - 8,
+      h: 118, // five lines of period metadata
+      fontSize: 14,
+      bold: false,
+      color: SO_HERO_TEXT_MUTED,
+    })
+  );
+  y += heroH + SO_SECTION_GAP;
+
+  // ---- Executive summary: KPI band + AI narrative -------------------------
+  // Three KPIs rather than a wall of them, so the band stays readable, plus the
+  // period's written summary as the one tinted card in the row.
+  const kpiH = 226;
+  const summary = soSection('summary', {
+    y,
+    title: 'Executive summary',
+    blurb: 'The three measures leadership commits to externally, and what changed behind them.',
+    bg: SO_SECTIONS.summary.bg,
+    border: SO_SECTIONS.summary.border,
+    bodyH: kpiH,
+  });
+  items.push(...summary.items);
+  const summaryY = summary.bodyY;
+
+  const kpis: Array<[string, string, Record<string, any>]> = [
+    [
+      'so-kpi-solved',
+      'Tickets solved',
+      {
+        chartType: 'so-kpi',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        description: 'Tickets moved to solved within the reporting period, all channels.',
+        value: '12,480',
+        change: 8.1,
+        sparkId: 'solved',
+        accent: '#2a78d6',
+        spark: [1780, 1910, 2020, 2140, 2210, 2420],
+        note: 'Volume rose while headcount held flat.',
+      },
+    ],
+    [
+      'so-kpi-resolution',
+      'Median full resolution',
+      {
+        chartType: 'so-kpi',
+        reportSource: 'Resolution Time Analysis',
+        reportType: 'KPI',
+        description: 'Median time from ticket creation to solved, business hours only.',
+        value: '5.8 h',
+        change: -36.3,
+        lowerIsBetter: true,
+        sparkId: 'resolution',
+        accent: '#1baf7a',
+        spark: [9.1, 8.6, 8.0, 7.2, 6.4, 5.8],
+        note: 'Fastest since tracking began in 2024.',
+      },
+    ],
+    [
+      'so-kpi-csat',
+      'Customer satisfaction',
+      {
+        chartType: 'so-kpi',
+        reportSource: 'Customer Satisfaction Analysis',
+        reportType: 'Analytics',
+        description: 'Share of rated tickets marked good, across all channels.',
+        value: '94.2%',
+        change: 3.8,
+        changeSuffix: ' pts',
+        sparkId: 'csat',
+        accent: '#eb6834',
+        spark: [90.4, 91.1, 91.8, 92.6, 93.5, 94.2],
+        note: 'Above the 92% annual goal for three weeks.',
+      },
+    ],
+  ];
+  kpis.forEach(([id, title, content], i) => {
+    items.push(
+      libChart(id, title, { x: soInX(i * 3), y: summaryY, w: soIn(3), h: kpiH }, content)
+    );
+  });
+  items.push(
+    libChart(
+      'so-summary-narrative',
+      'Period summary',
+      { x: soInX(9), y: summaryY, w: soIn(3), h: kpiH },
+      {
+        chartType: 'so-narrative',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        heading: 'What changed this period',
+        summary:
+          'Faster routing cut resolution time by a third without hurting quality — but the gains are unevenly spread.',
+        points: [
+          'Chat overtook email as the busiest channel in week 31.',
+          'Urgent-priority SLA slipped to 82%, below the 90% commitment.',
+          'Escalations is running at 96% occupancy with a growing backlog.',
+        ],
+      },
+      SO_CARD_CHROME
+    )
+  );
+  y += summary.height + SO_SECTION_GAP;
+
+  // ---- Demand & contact drivers ------------------------------------------
+  // Wide composition chart paired with a smaller proportional view.
+  const demandH = 356;
+  const demand = soSection('demand', {
+    y,
+    title: 'Demand and contact drivers',
+    blurb: 'Where contacts arrive from and what customers are contacting us about — the input side of the queue.',
+    bg: SO_SECTIONS.demand.bg,
+    border: SO_SECTIONS.demand.border,
+    bodyH: demandH,
+  });
+  items.push(...demand.items);
+  items.push(
+    libChart(
+      'so-demand-channels',
+      'Contact volume by channel, by week',
+      { x: soInX(0), y: demand.bodyY, w: soIn(8), h: demandH },
+      {
+        chartType: 'so-stacked-bar',
+        reportSource: 'Channel Performance Overview',
+        reportType: 'Performance',
+        description: 'Weekly inbound contacts, stacked by channel. Social, web form and voice callback are grouped as Other.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'so-demand-reasons',
+      'Share of contacts by reason',
+      { x: soInX(8), y: demand.bodyY, w: soIn(4), h: demandH },
+      {
+        chartType: 'so-donut',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        description: 'Contacts grouped by primary reason code for the reporting period.',
+      }
+    )
+  );
+  y += demand.height + SO_SECTION_GAP;
+
+  // ---- Service efficiency & SLA ------------------------------------------
+  // Two comparison charts side by side, then the risk callout underneath, all on
+  // the one section panel.
+  const serviceChartH = 330;
+  const serviceCalloutH = 166;
+  const service = soSection('service', {
+    y,
+    title: 'Service efficiency and SLA',
+    blurb: 'How quickly we respond and resolve, and whether we are keeping the commitments we sold.',
+    bg: SO_SECTIONS.service.bg,
+    border: SO_SECTIONS.service.border,
+    bodyH: serviceChartH + LIB_GAP + serviceCalloutH,
+  });
+  items.push(...service.items);
+  items.push(
+    libChart(
+      'so-service-response',
+      'First reply and full resolution time',
+      { x: soInX(0), y: service.bodyY, w: soIn(7), h: serviceChartH },
+      {
+        chartType: 'so-responsiveness',
+        reportSource: 'Response Time Monitoring',
+        reportType: 'KPI',
+        description: 'Median hours to first reply and to full resolution. Both measures share one axis because both are hours.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'so-service-sla',
+      'SLA attainment by priority',
+      { x: soInX(7), y: service.bodyY, w: soIn(5), h: serviceChartH },
+      {
+        chartType: 'so-sla-priority',
+        reportSource: 'SLA Compliance Report',
+        reportType: 'Compliance',
+        description: 'Share of tickets resolved inside their SLA target, split by priority, against the 90% commitment.',
+      }
+    )
+  );
+  const serviceCalloutY = service.bodyY + serviceChartH + LIB_GAP;
+
+  items.push(
+    libChart(
+      'so-service-callout',
+      'Threshold breach',
+      { x: soInX(0), y: serviceCalloutY, w: soIn(6), h: serviceCalloutH },
+      {
+        chartType: 'so-callout',
+        tone: 'risk',
+        reportSource: 'SLA Compliance Report',
+        reportType: 'Compliance',
+        heading: 'Urgent-priority SLA has breached its 90% commitment',
+        body:
+          'Urgent tickets finished inside SLA 82% of the time this period, down 6 points. Two enterprise contracts carry service credits at 90%.',
+        metric: '82%',
+        metricLabel: 'attainment vs 90% target',
+      },
+      SO_CARD_CHROME
+    )
+  );
+  items.push(
+    libChart(
+      'so-service-win',
+      'Material improvement',
+      { x: soInX(6), y: serviceCalloutY, w: soIn(6), h: serviceCalloutH },
+      {
+        chartType: 'so-callout',
+        tone: 'win',
+        reportSource: 'Resolution Time Analysis',
+        reportType: 'KPI',
+        heading: 'Routing changes cut resolution time by a third',
+        body:
+          'The skills-based routing rollout in week 28 is the single largest driver, and it held through a 12% rise in volume.',
+        metric: '−3.3 h',
+        metricLabel: 'median resolution vs week 27',
+      },
+      SO_CARD_CHROME
+    )
+  );
+  y += service.height + SO_SECTION_GAP;
+
+  // ---- Customer experience & quality -------------------------------------
+  // A trend chart next to a ranked detail table.
+  const cxH = 340;
+  const cx = soSection('experience', {
+    y,
+    title: 'Customer experience and quality',
+    blurb: 'Whether faster service is also better service, and which issues cost customers the most effort.',
+    bg: SO_SECTIONS.experience.bg,
+    border: SO_SECTIONS.experience.border,
+    bodyH: cxH,
+  });
+  items.push(...cx.items);
+  items.push(
+    libChart(
+      'so-cx-csat',
+      'Satisfaction trend',
+      { x: soInX(0), y: cx.bodyY, w: soIn(5), h: cxH },
+      {
+        chartType: 'so-csat-trend',
+        reportSource: 'Customer Satisfaction Analysis',
+        reportType: 'Analytics',
+        description: 'Weekly share of rated tickets marked good.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'so-cx-issues',
+      'Top customer issues by volume',
+      { x: soInX(5), y: cx.bodyY, w: soIn(7), h: cxH },
+      {
+        chartType: 'so-table-issues',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Support',
+        description: 'Ranked customer issues with period-over-period change and the satisfaction score they carry.',
+      }
+    )
+  );
+  y += cx.height + SO_SECTION_GAP;
+
+  // ---- Team performance & capacity ---------------------------------------
+  const teamH = 336;
+  const teams = soSection('teams', {
+    y,
+    title: 'Team performance and capacity',
+    blurb: 'Who is carrying the load and which teams have no headroom left if volume keeps climbing.',
+    bg: SO_SECTIONS.teams.bg,
+    border: SO_SECTIONS.teams.border,
+    bodyH: teamH,
+  });
+  items.push(...teams.items);
+  items.push(
+    libChart(
+      'so-teams-volume',
+      'Tickets solved by team',
+      { x: soInX(0), y: teams.bodyY, w: soIn(6), h: teamH },
+      {
+        chartType: 'so-team-volume',
+        reportSource: 'Team Productivity Metrics',
+        reportType: 'Performance',
+        description: 'Solved ticket count per team for the reporting period.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'so-teams-attention',
+      'Teams needing attention',
+      { x: soInX(6), y: teams.bodyY, w: soIn(6), h: teamH },
+      {
+        chartType: 'so-table-teams',
+        reportSource: 'Agent Utilization Report',
+        reportType: 'Performance',
+        description: 'SLA attainment, open backlog and occupancy per team, ordered by risk.',
+      }
+    )
+  );
+  y += teams.height + 28;
+
+  // ---- Footer: dig-deeper links ------------------------------------------
+  items.push({
+    id: 'so-rule-footer',
+    type: 'separator',
+    position: { x: libX(0), y },
+    size: { width: libSpan(12), height: 12 },
+    content: { style: { borderWidth: 1, borderColor: '#e4e6e8' } },
+  });
+  y += 20;
+  items.push(
+    libHeading('so-h-more', 'Dig deeper', { x: libX(0), y, w: libSpan(4), fontSize: 16, fontWeight: 500, color: '#68737d' })
+  );
+  y += 28;
+  const links: Array<[string, string, string]> = [
+    ['so-link-1', 'SLA compliance report →', 'SLA Compliance Report'],
+    ['so-link-2', 'Escalation trends →', 'Escalation Trends'],
+    ['so-link-3', 'Backlog analysis →', 'Backlog Analysis'],
+    ['so-link-4', 'Agent utilization →', 'Agent Utilization Report'],
+  ];
+  links.forEach(([id, label, assetName], i) => {
+    items.push(libLink(id, label, { x: libX(i * 3), y, w: libSpan(3), assetName }));
+  });
+
+  return items;
+}
+
+// ---------------------------------------------------------------------------
+// Prepopulated layout for the support operations monitoring dashboard
+// ---------------------------------------------------------------------------
+// This used to be a hand-built page of its own. It is a dashboard, so it is
+// authored as dashboard content and opened in the builder like any other — which
+// means it inherits tabs, edit mode, saved views, sharing and, crucially, the
+// one global filter bar in the toolbar. The page's own row of filter chips is
+// gone: duplicating filters inside the canvas gave two sources of truth for the
+// same scope.
+const MON_SECTIONS = {
+  exec: { bg: '#f4f8fc', border: '#c8dcec', accent: '#144a75' },
+  demand: { bg: '#f7f5fd', border: '#dcd6f5', accent: '#5f4fd1' },
+  sla: { bg: '#fdf8f1', border: '#f0dcc4', accent: '#ad5918' },
+  cx: { bg: '#f2faf8', border: '#c9e8e2', accent: '#0b7d6e' },
+  team: { bg: '#f5f6fb', border: '#d5daee', accent: '#3d4fa1' },
+  risk: { bg: '#fdf6f6', border: '#f0d4d5', accent: '#a3232b' },
+};
+
+function createMonitoringDashboardItems(): ContentItem[] {
+  const items: ContentItem[] = [];
+  let y = LIB_M;
+
+  // ---- Hero ---------------------------------------------------------------
+  // The lede: what the period says in one sentence, so the rest of the
+  // dashboard is read as evidence for it rather than as a pile of charts.
+  const heroH = 184;
+  items.push(
+    libPanel('mon-hero-panel', {
+      x: libX(0),
+      y,
+      w: libSpan(12),
+      h: heroH,
+      bg: SO_HERO_BG,
+      border: SO_HERO_BG,
+    })
+  );
+  items.push(
+    libHeading('mon-hero-eyebrow', 'Live · updated 2 minutes ago', {
+      x: libX(0) + SO_PAD + 8,
+      y: y + SO_PAD + 4,
+      w: libSpan(6),
+      fontSize: 14,
+      fontWeight: 500,
+      color: SO_HERO_TEXT_MUTED,
+    })
+  );
+  items.push(
+    libHeading('mon-hero-title', 'Support operations, at a glance', {
+      x: libX(0) + SO_PAD + 8,
+      y: y + SO_PAD + 28,
+      w: libSpan(8),
+      fontSize: 32,
+      fontWeight: 500,
+      color: SO_HERO_TEXT,
+    })
+  );
+  items.push(
+    libHeading(
+      'mon-hero-intro',
+      'Demand is running 18% above forecast, driven almost entirely by billing contacts. Response SLA is holding, but resolution SLA has slipped for five consecutive weeks and needs a capacity decision this week. CSAT and AI containment both continue to improve.',
+      {
+        x: libX(0) + SO_PAD + 8,
+        y: y + SO_PAD + 80,
+        w: libSpan(8),
+        h: 70, // two wrapped lines — text boxes clip without an explicit height
+        fontSize: 15,
+        bold: false,
+        color: SO_HERO_TEXT_MUTED,
+      }
+    )
+  );
+  items.push(
+    libHeading('mon-hero-meta', 'Reporting period\n1 – 31 July 2026\n\nCompared with\n1 – 30 June 2026', {
+      x: libX(9),
+      y: y + SO_PAD + 20,
+      w: libSpan(3) - SO_PAD - 8,
+      h: 118,
+      fontSize: 14,
+      bold: false,
+      color: SO_HERO_TEXT_MUTED,
+    })
+  );
+  y += heroH + SO_SECTION_GAP;
+
+  // ---- Executive summary --------------------------------------------------
+  // Four headline numbers, then the demand-vs-plan chart that explains them and
+  // the written read of the period beside it.
+  const kpiH = 200;
+  const execRowH = 318;
+  const exec = soSection('mon-exec', {
+    y,
+    title: 'Executive summary',
+    blurb: 'The four numbers leaders are asking about. Resolution SLA is the one exception this month — everything else is on or ahead of target.',
+    bg: MON_SECTIONS.exec.bg,
+    border: MON_SECTIONS.exec.border,
+    bodyH: kpiH + LIB_GAP + execRowH,
+  });
+  items.push(...exec.items);
+
+  const kpis: Array<[string, string, Record<string, any>]> = [
+    [
+      'mon-kpi-solved',
+      'Tickets solved',
+      {
+        chartType: 'mon-kpi',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        description: 'Tickets moved to solved in the reporting period, all channels.',
+        value: '12,480',
+        change: 8.1,
+        note: 'Volume rose while headcount held flat.',
+      },
+    ],
+    [
+      'mon-kpi-sla',
+      'Resolution SLA met',
+      {
+        chartType: 'mon-kpi',
+        reportSource: 'SLA Compliance Report',
+        reportType: 'Compliance',
+        description: 'Share of tickets resolved inside their SLA target, against the 90% commitment.',
+        value: '81',
+        unit: '%',
+        change: -9,
+        changeSuffix: ' pts',
+        // The one number that is off target, so it carries a status pill — the
+        // word does the work, the colour only reinforces it.
+        state: 'critical',
+        note: 'Target 90% · declining for five weeks.',
+      },
+    ],
+    [
+      'mon-kpi-csat',
+      'Customer satisfaction',
+      {
+        chartType: 'mon-kpi',
+        reportSource: 'Customer Satisfaction Analysis',
+        reportType: 'Analytics',
+        description: 'Share of rated tickets marked good, all channels.',
+        value: '94.6',
+        unit: '%',
+        change: 1.5,
+        changeSuffix: ' pts',
+        note: 'Above the 92% target all month.',
+      },
+    ],
+    [
+      'mon-kpi-ai',
+      'AI containment',
+      {
+        chartType: 'mon-kpi',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        description: 'Conversations resolved by the AI agent with no agent involvement.',
+        value: '34',
+        unit: '%',
+        change: 4,
+        changeSuffix: ' pts',
+        note: '4,240 conversations contained.',
+      },
+    ],
+  ];
+  kpis.forEach(([id, title, content], i) => {
+    items.push(libChart(id, title, { x: soInX(i * 3), y: exec.bodyY, w: soIn(3), h: kpiH }, content));
+  });
+  const execRowY = exec.bodyY + kpiH + LIB_GAP;
+
+  items.push(
+    libChart(
+      'mon-exec-volume',
+      'Ticket volume vs. forecast',
+      { x: soInX(0), y: execRowY, w: soIn(8), h: execRowH },
+      {
+        chartType: 'mon-volume-forecast',
+        reportSource: 'Real-time Monitoring',
+        reportType: 'Monitoring',
+        description: 'Contacts received per hour against the staffing forecast for the same hour.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'mon-exec-narrative',
+      'AI summary',
+      { x: soInX(8), y: execRowY, w: soIn(4), h: execRowH },
+      {
+        chartType: 'mon-narrative',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        heading: 'Billing is the whole story',
+        summary:
+          'Billing and refund contacts are up 18% and account for 78% of the total volume increase. Every other driver is flat or down.',
+        points: [
+          'Resolution SLA fell in the Billing team only — the other three are inside target.',
+          'That makes this a capacity problem rather than a process one.',
+          'Reallocating agents is the fastest lever available this week.',
+        ],
+      },
+      SO_CARD_CHROME
+    )
+  );
+  y += exec.height + SO_SECTION_GAP;
+
+  // ---- Demand and contact drivers ----------------------------------------
+  // Composition over time next to the ranked list: one says which channels
+  // absorbed the growth, the other says what customers were contacting about.
+  const demandH = 356;
+  const demand = soSection('mon-demand', {
+    y,
+    title: 'Demand and contact drivers',
+    blurb: 'Where the volume is coming from, and what customers are actually contacting us about.',
+    bg: MON_SECTIONS.demand.bg,
+    border: MON_SECTIONS.demand.border,
+    bodyH: demandH,
+  });
+  items.push(...demand.items);
+  items.push(
+    libChart(
+      'mon-demand-channels',
+      'Ticket volume by channel',
+      { x: soInX(0), y: demand.bodyY, w: soIn(7), h: demandH },
+      {
+        chartType: 'mon-channel-mix',
+        reportSource: 'Channel Performance Overview',
+        reportType: 'Performance',
+        description: 'Daily inbound contacts stacked by channel for the current week.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'mon-demand-drivers',
+      'Top contact drivers',
+      { x: soInX(7), y: demand.bodyY, w: soIn(5), h: demandH },
+      {
+        chartType: 'mon-drivers',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Support',
+        description: 'Ranked by volume this month, with change against the previous period.',
+      }
+    )
+  );
+  y += demand.height + SO_SECTION_GAP;
+
+  // ---- Service efficiency and SLA ----------------------------------------
+  // The breach gets called out above the charts that evidence it, so the reader
+  // meets the conclusion before the detail.
+  const slaCalloutH = 150;
+  const slaH = 324;
+  const sla = soSection('mon-sla', {
+    y,
+    title: 'Service efficiency and SLA',
+    blurb: 'Response is holding; resolution is not. Added volume is being absorbed in resolution time, and that is where the target is missed.',
+    bg: MON_SECTIONS.sla.bg,
+    border: MON_SECTIONS.sla.border,
+    bodyH: slaCalloutH + LIB_GAP + slaH,
+  });
+  items.push(...sla.items);
+  items.push(
+    libChart(
+      'mon-sla-callout',
+      'Threshold breach',
+      { x: soInX(0), y: sla.bodyY, w: soIn(12), h: slaCalloutH },
+      {
+        chartType: 'mon-callout',
+        tone: 'watch',
+        reportSource: 'SLA Compliance Report',
+        reportType: 'Compliance',
+        heading: 'Resolution SLA has been below target for five consecutive weeks',
+        body:
+          '81% against a 90% target, down 9 points since the start of the month. 212 of the 412 at-risk tickets sit in the Billing queue.',
+      },
+      SO_CARD_CHROME
+    )
+  );
+  const slaChartY = sla.bodyY + slaCalloutH + LIB_GAP;
+
+  items.push(
+    libChart(
+      'mon-sla-trend',
+      'SLA attainment over time',
+      { x: soInX(0), y: slaChartY, w: soIn(7), h: slaH },
+      {
+        chartType: 'mon-sla-trend',
+        reportSource: 'SLA Compliance Report',
+        reportType: 'Compliance',
+        description: 'Weekly response and resolution SLA attainment. Both are percentages, so they share one axis.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'mon-sla-priority',
+      'SLA attainment by priority',
+      { x: soInX(7), y: slaChartY, w: soIn(5), h: slaH },
+      {
+        chartType: 'mon-sla-priority',
+        reportSource: 'SLA Compliance Report',
+        reportType: 'Compliance',
+        description: 'Attainment against each priority band’s own target.',
+      }
+    )
+  );
+  y += sla.height + SO_SECTION_GAP;
+
+  // ---- Customer experience and quality -----------------------------------
+  const cxH = 328;
+  const cx = soSection('mon-cx', {
+    y,
+    title: 'Customer experience and quality',
+    blurb: 'Satisfaction is improving despite the pressure — first response stayed fast and AI containment absorbed the simpler contacts.',
+    bg: MON_SECTIONS.cx.bg,
+    border: MON_SECTIONS.cx.border,
+    bodyH: cxH,
+  });
+  items.push(...cx.items);
+  items.push(
+    libChart(
+      'mon-cx-csat',
+      'Satisfaction trend',
+      { x: soInX(0), y: cx.bodyY, w: soIn(7), h: cxH },
+      {
+        chartType: 'mon-csat-trend',
+        reportSource: 'Customer Satisfaction Analysis',
+        reportType: 'Analytics',
+        description: 'Weekly share of rated tickets marked good.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'mon-cx-resolution',
+      'How tickets were resolved',
+      { x: soInX(7), y: cx.bodyY, w: soIn(5), h: cxH },
+      {
+        chartType: 'mon-resolution-mix',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        description: 'Three parts of one whole: closed by the AI agent, closed by an agent, or escalated.',
+      }
+    )
+  );
+  y += cx.height + SO_SECTION_GAP;
+
+  // ---- Team performance and capacity -------------------------------------
+  const teamH = 336;
+  const teams = soSection('mon-team', {
+    y,
+    title: 'Team performance and capacity',
+    blurb: 'One team is carrying the overload. Every other team has headroom, which makes reallocation the fastest available lever.',
+    bg: MON_SECTIONS.team.bg,
+    border: MON_SECTIONS.team.border,
+    bodyH: teamH,
+  });
+  items.push(...teams.items);
+  items.push(
+    libChart(
+      'mon-team-load',
+      'Load against planned capacity',
+      { x: soInX(0), y: teams.bodyY, w: soIn(5), h: teamH },
+      {
+        chartType: 'mon-team-load',
+        reportSource: 'Agent Utilization Report',
+        reportType: 'Performance',
+        description: '100% is the volume each team is staffed to handle this month.',
+      }
+    )
+  );
+  items.push(
+    libChart(
+      'mon-team-table',
+      'Teams requiring attention',
+      { x: soInX(5), y: teams.bodyY, w: soIn(7), h: teamH },
+      {
+        chartType: 'mon-team-table',
+        reportSource: 'Agent Utilization Report',
+        reportType: 'Performance',
+        description: 'Ranked by backlog. Status combines SLA attainment and capacity headroom.',
+      }
+    )
+  );
+  y += teams.height + SO_SECTION_GAP;
+
+  // ---- What changed and where it lands -----------------------------------
+  // The dashboard closes on a read of the period rather than on another chart.
+  const insightH = 188;
+  const risk = soSection('mon-risk', {
+    y,
+    title: 'What changed and where it lands',
+    blurb: 'The movements behind the numbers above, and where the current trajectory ends up.',
+    bg: MON_SECTIONS.risk.bg,
+    border: MON_SECTIONS.risk.border,
+    bodyH: insightH,
+  });
+  items.push(...risk.items);
+  const insightY = risk.bodyY;
+
+  items.push(
+    libChart(
+      'mon-risk-changed',
+      'What changed',
+      { x: soInX(0), y: insightY, w: soIn(6), h: insightH },
+      {
+        chartType: 'mon-narrative',
+        reportSource: 'Real-time Monitoring',
+        reportType: 'Monitoring',
+        heading: 'Material changes this period',
+        summary: 'Five movements account for everything above.',
+        points: [
+          'Resolution SLA −9 pts — the first breach of target this year.',
+          'Billing volume +18%; AI containment +4 pts; CSAT +1.5 pts.',
+          'Agent headcount unchanged.',
+        ],
+      },
+      SO_CARD_CHROME
+    )
+  );
+  items.push(
+    libChart(
+      'mon-risk-projection',
+      'If nothing changes',
+      { x: soInX(6), y: insightY, w: soIn(6), h: insightH },
+      {
+        chartType: 'mon-narrative',
+        reportSource: 'Real-time Monitoring',
+        reportType: 'Monitoring',
+        heading: 'Projected impact by month end',
+        summary: 'On the current trajectory, this period’s one miss becomes next period’s two.',
+        points: [
+          'Resolution SLA reaches 76%; the billing backlog grows to ~340 tickets.',
+          'CSAT lags resolution by about three weeks, so the gain is at risk from mid-August.',
+        ],
+      },
+      SO_CARD_CHROME
+    )
+  );
+  y += risk.height + 28;
+
+  // ---- Footer: dig-deeper links ------------------------------------------
+  items.push({
+    id: 'mon-rule-footer',
+    type: 'separator',
+    position: { x: libX(0), y },
+    size: { width: libSpan(12), height: 12 },
+    content: { style: { borderWidth: 1, borderColor: '#e4e6e8' } },
+  });
+  y += 20;
+  items.push(
+    libHeading('mon-h-more', 'Dig deeper', { x: libX(0), y, w: libSpan(4), fontSize: 16, fontWeight: 500, color: '#68737d' })
+  );
+  y += 28;
+  const monLinks: Array<[string, string, string]> = [
+    ['mon-link-1', 'At-risk tickets →', 'SLA Compliance Report'],
+    ['mon-link-2', 'Billing queue backlog →', 'Backlog Analysis'],
+    ['mon-link-3', 'Agent utilization →', 'Agent Utilization Report'],
+    ['mon-link-4', 'Channel performance →', 'Channel Performance Overview'],
+  ];
+  monLinks.forEach(([id, label, assetName], i) => {
+    items.push(libLink(id, label, { x: libX(i * 3), y, w: libSpan(3), assetName }));
+  });
+
+  return items;
+}
+
+// The monitoring dashboard is a specific saved dashboard, so it is matched by
+// name; every other prebuilt dashboard gets the service-review layout.
+const MONITORING_DASHBOARD_TITLE = 'Real-time Monitoring';
 
 const filterOptions = [
   {
@@ -1075,7 +2117,7 @@ function AddFilterMenu({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-8 w-8 shrink-0 p-0 hover:bg-muted ${FLORA_BTN}`}
+            className={`w-[32px] shrink-0 p-0 hover:bg-muted ${FLORA_BTN} !h-[32px]`}
             aria-label="Add filter"
           >
             {filterIcon}
@@ -2079,147 +3121,32 @@ function DashboardActiveFilter({
   );
 }
 
-export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel, onClose, onUpdateTitle, isFromCard, initialData, onOpenAnalyticsAssistant }: DashboardBuilderProps) {
+export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel, onClose, onUpdateTitle, isFromCard, initialData, onOpenAnalyticsAssistant, onNavigateToProject }: DashboardBuilderProps) {
   // Determine if this is an existing dashboard from the library
   const isExistingDashboard = initialData?.isNew === false && initialData?.fromCard === true;
   const shouldPrepopulate = isFromCard || isExistingDashboard;
-  
+  // A dashboard opened from the library arrives with content, so it starts in
+  // view mode. A dashboard the user just created is blank, so it starts in edit
+  // mode. (initialData.isNew can't be used here: the library open paths set it
+  // to true as well, and it also drives the pre-created dashboard routing.)
+  const startsInEditMode = !shouldPrepopulate;
+  // A brand-new dashboard has no project or subproject until it is saved, so
+  // there is no location to point at yet.
+  const [hasLocation, setHasLocation] = useState(shouldPrepopulate);
+
+  // Which prebuilt content an opened dashboard arrives with. The monitoring
+  // dashboard has its own layout; anything else opened from the library gets the
+  // service-review one.
+  const openedDashboardName = dashboardTitle || initialData?.dashboardName;
   const [tabs, setTabs] = useState<DashboardTab[]>([
-    { 
-      id: 'tab-1', 
-      name: 'Tab 1', 
-      contentItems: shouldPrepopulate ? [
-        {
-          id: 'chart-1',
-          type: 'chart',
-          title: 'Ticket Volume Trends',
-          position: { x: 24, y: 24 },
-          size: { width: 420, height: 300 },
-          content: {
-            chartType: 'line-chart',
-            reportSource: 'Ticket Volume Trends',
-            reportType: 'Analytics',
-            liveData: true
-          }
-        },
-        {
-          id: 'chart-2',
-          type: 'chart',
-          title: 'Agent Performance',
-          position: { x: 460, y: 24 },
-          size: { width: 420, height: 300 },
-          content: {
-            chartType: 'bar-chart',
-            reportSource: 'Agent Performance Dashboard',
-            reportType: 'Performance',
-            liveData: true
-          }
-        },
-        {
-          id: 'chart-3',
-          type: 'chart',
-          title: 'Response Time Distribution',
-          position: { x: 896, y: 24 },
-          size: { width: 420, height: 300 },
-          content: {
-            chartType: 'area-chart',
-            reportSource: 'Response Time Monitoring',
-            reportType: 'KPI',
-            liveData: true
-          }
-        },
-        {
-          id: 'chart-4',
-          type: 'chart',
-          title: 'Resolution Time KPI',
-          position: { x: 24, y: 340 },
-          size: { width: 315, height: 250 },
-          content: {
-            chartType: 'kpi-resolution-time',
-            reportSource: 'Resolution Time Analysis',
-            reportType: 'KPI',
-            kpiData: {
-              averageResolutionTime: '2.3 hours',
-              change: '-18%',
-              trend: 'down',
-              previousPeriod: '2.8 hours'
-            }
-          }
-        },
-        {
-          id: 'chart-5',
-          type: 'chart',
-          title: 'Customer Satisfaction',
-          position: { x: 355, y: 340 },
-          size: { width: 315, height: 250 },
-          content: {
-            chartType: 'metric-card',
-            reportSource: 'Customer Satisfaction Analysis',
-            reportType: 'Analytics',
-            kpiData: {
-              value: '94.2%',
-              change: '+3.2%',
-              trend: 'up',
-              previousPeriod: '91.3%'
-            }
-          }
-        },
-        {
-          id: 'chart-6',
-          type: 'chart',
-          title: 'SLA Compliance',
-          position: { x: 686, y: 340 },
-          size: { width: 315, height: 250 },
-          content: {
-            chartType: 'pie-chart',
-            reportSource: 'SLA Compliance Report',
-            reportType: 'Compliance'
-          }
-        },
-        {
-          id: 'chart-7',
-          type: 'chart',
-          title: 'First Contact Resolution',
-          position: { x: 1017, y: 340 },
-          size: { width: 315, height: 250 },
-          content: {
-            chartType: 'metric-card',
-            reportSource: 'First Contact Resolution',
-            reportType: 'KPI',
-            kpiData: {
-              value: '78.5%',
-              change: '+5.3%',
-              trend: 'up',
-              previousPeriod: '74.6%'
-            }
-          }
-        },
-        {
-          id: 'chart-8',
-          type: 'chart',
-          title: 'Top Support Categories',
-          position: { x: 24, y: 606 },
-          size: { width: 530, height: 300 },
-          content: {
-            chartType: 'bar-chart',
-            reportSource: 'Customer Support Analytics',
-            reportType: 'Support'
-          }
-        },
-        {
-          id: 'chart-9',
-          type: 'chart',
-          title: 'Recent Tickets',
-          position: { x: 570, y: 606 },
-          size: { width: 762, height: 300 },
-          content: {
-            chartType: 'table',
-            reportSource: 'Customer Support Analytics',
-            reportType: 'Support',
-            liveData: true
-          }
-        }
-      ] : [] // Empty array for new dashboards
+    {
+      id: 'tab-1',
+      name: 'Tab 1',
+      contentItems: !shouldPrepopulate
+        ? [] // a dashboard the user just created starts blank
+        : openedDashboardName === MONITORING_DASHBOARD_TITLE
+          ? createMonitoringDashboardItems()
+          : createLibraryDashboardItems(),
     }
   ]);
   const [activeTabId, setActiveTabId] = useState<string>('tab-1');
@@ -2234,7 +3161,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   // Id of the currently selected/active widget. Its contextual toolbar and
   // resize handles are only shown once it is clicked.
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(true);
+  const [isEditing, setIsEditing] = useState(startsInEditMode);
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(true);
   const [refreshRate, setRefreshRate] = useState('default');
   // Remembers the rate active before switching to "Paused" so removing the pause tag can restore it.
@@ -2252,8 +3179,18 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [showReportsModal, setShowReportsModal] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(dashboardTitle || initialData?.dashboardName || 'Untitled dashboard');
+  // Starring is a viewing-mode action — the star sits where the rename pencil
+  // would be in edit mode.
+  const [isStarred, setIsStarred] = useState(false);
   const displayProjectName = projectName || initialData?.projectName || 'My project';
   const displaySubprojectName = initialData?.subprojectName || 'Subproject';
+  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+  // Picking a folder in the location menu leaves the builder and opens that
+  // project in the library.
+  const handleOpenLocation = (folderName: string) => {
+    setIsLocationMenuOpen(false);
+    onNavigateToProject?.(folderName);
+  };
   // Every dashboard (new or opened) starts with a Last 30 days date filter
   const [activeFilters, setActiveFilters] = useState<Array<{ id: string; label: string; value: string; typeId: string }>>([
     { id: 'filter-default-date-range', label: 'Date Range', value: 'Last 30 days', typeId: 'date-range' },
@@ -2265,6 +3202,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [bookmarkName, setBookmarkName] = useState('');
   const [isSavingAsNew, setIsSavingAsNew] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  // Reverting throws away unsaved edits, so it asks first.
+  const [showRevertModal, setShowRevertModal] = useState(false);
 
   // Save dashboard modal (name / description / url / project)
   const [showSaveDashboardModal, setShowSaveDashboardModal] = useState(false);
@@ -2826,6 +3765,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     setEditedTitle(saveForm.name.trim());
     onUpdateTitle?.(saveForm.name.trim());
     onSave?.(dashboardConfig);
+    // Saving picks a project, so the dashboard now has a location to show.
+    setHasLocation(true);
     setShowSaveDashboardModal(false);
   };
 
@@ -2845,87 +3786,98 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
             {isEditing && (
               <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-[#f3f4f4] px-1.5 py-1">
                 {toolbarItems.map((tool) => (
-                  'isDropdown' in tool && tool.isDropdown ? (
-                    <DropdownMenu key={tool.id}>
-                      <FloraTooltip content={tool.label} placement="bottom" size="small">
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label={tool.label}
-                            className={`gap-0.5 px-1.5 shrink-0 hover:!bg-white ${FLORA_BTN}`}
-                          >
-                            {tool.icon}
-                            <ChevronDown className={FLORA_ICON} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                      </FloraTooltip>
-                      <DropdownMenuContent align="start" className="w-44">
-                        {tool.children?.map((child) => (
-                          <DropdownMenuItem
-                            key={child.id}
-                            className="gap-3"
-                            onClick={() => handleToolSelect(child.id)}
-                          >
-                            {child.icon}
-                            <MD tag="span" className="!text-foreground">{child.label}</MD>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <FloraTooltip
-                      key={tool.id}
-                      content={'disabled' in tool && tool.disabled ? `${tool.label} - Coming soon` : tool.label}
-                      placement="bottom"
-                      size="small"
+                  <FloraTooltip
+                    key={tool.id}
+                    content={
+                      'disabled' in tool && tool.disabled
+                        ? `${tool.label} - Coming soon`
+                        : toolTooltip(tool.label, 'shortcut' in tool ? tool.shortcut : undefined)
+                    }
+                    placement="bottom"
+                    size="small"
+                  >
+                    <Button
+                      variant={selectedTool === tool.id ? "secondary" : "ghost"}
+                      size="sm"
+                      aria-label={tool.label}
+                      aria-disabled={'disabled' in tool && tool.disabled ? true : undefined}
+                      onClick={() => {
+                        if ('disabled' in tool && tool.disabled) return;
+                        handleToolSelect(tool.id);
+                      }}
+                      className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN} ${'disabled' in tool && tool.disabled ? 'opacity-50 hover:!bg-transparent' : ''}`}
                     >
+                      {tool.icon}
+                    </Button>
+                  </FloraTooltip>
+                ))}
+
+                {/* Overflow: the remaining insert tools */}
+                <DropdownMenu>
+                  <FloraTooltip content="More tools" placement="bottom" size="small">
+                    <DropdownMenuTrigger asChild>
                       <Button
-                        variant={selectedTool === tool.id ? "secondary" : "ghost"}
+                        variant="ghost"
                         size="sm"
-                        aria-label={tool.label}
-                        aria-disabled={'disabled' in tool && tool.disabled ? true : undefined}
+                        aria-label="More tools"
+                        className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
+                      >
+                        <ChevronDown className={FLORA_TOOLBAR_ICON} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </FloraTooltip>
+                  <DropdownMenuContent align="center" className="w-48">
+                    {toolbarOverflowItems.map((tool) => (
+                      <DropdownMenuItem
+                        key={tool.id}
+                        className="gap-3"
+                        disabled={tool.disabled}
                         onClick={() => {
-                          if ('disabled' in tool && tool.disabled) return;
+                          if (tool.disabled) return;
                           handleToolSelect(tool.id);
                         }}
-                        className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN} ${'disabled' in tool && tool.disabled ? 'opacity-50 hover:!bg-transparent' : ''}`}
                       >
                         {tool.icon}
-                      </Button>
-                    </FloraTooltip>
-                  )
-                ))}
+                        <MD tag="span" className="!text-foreground">{tool.label}</MD>
+                        {!tool.disabled && (
+                          <MD tag="span" className="ml-auto pl-3 !text-muted-foreground">
+                            {tool.shortcut}
+                          </MD>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <div className="mx-0.5 h-5 w-px shrink-0 bg-[#dcdcda]" aria-hidden="true" />
 
-                <FloraTooltip content="Layout and appearance" placement="bottom" size="small">
+                <FloraTooltip content="Edit layout and appearance" placement="bottom" size="small">
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label="Layout and appearance"
-                    onClick={() => console.log('Layout and appearance')}
+                    aria-label="Edit layout and appearance"
+                    onClick={() => console.log('Edit layout and appearance')}
                     className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
                   >
                     <Palette className={FLORA_TOOLBAR_ICON} />
                   </Button>
                 </FloraTooltip>
 
-                <FloraTooltip content="View dev mode" placement="bottom" size="small">
+                <FloraTooltip content="Edit in dev mode" placement="bottom" size="small">
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label="View dev mode"
-                    onClick={() => console.log('View dev mode')}
+                    aria-label="Edit in dev mode"
+                    onClick={() => console.log('Edit in dev mode')}
                     className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
                   >
-                    <CodeIcon className={FLORA_TOOLBAR_ICON} style={{ width: 16, height: 16 }} />
+                    <TerminalStroke className={FLORA_TOOLBAR_ICON} style={{ width: 16, height: 16 }} />
                   </Button>
                 </FloraTooltip>
               </div>
             )}
             <div className="flex items-center gap-3 group">
-              {isEditingTitle ? (
+              {isEditingTitle && isEditing ? (
                 <div className="flex items-center gap-1">
                   <Input
                     value={editedTitle}
@@ -2967,26 +3919,81 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </div>
               ) : (
                 <div className="flex items-center gap-1 text-base font-normal">
-                  <FloraTooltip
-                    content={`${displayProjectName} / ${displaySubprojectName} / ${editedTitle}`}
-                    placement="bottom"
-                    size="small"
-                  >
+                  {hasLocation && (
+                  <DropdownMenu open={isLocationMenuOpen} onOpenChange={setIsLocationMenuOpen}>
+                    {/* The menu itself lists the breadcrumb trail, so the tooltip
+                        only needs to name what the icon opens. */}
+                    <FloraTooltip content="Location" placement="bottom" size="small">
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          // 32px matches the filter bar's icon box below, so the
+                          // folder and filter glyphs share one left edge.
+                          className="flex h-[32px] w-[32px] items-center justify-center rounded text-[#68737d] hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
+                          aria-label="Dashboard location"
+                        >
+                          <Folder className={FLORA_ICON} />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </FloraTooltip>
+                    <DropdownMenuContent align="start" className="w-64">
+                      <DropdownMenuLabel className={FLORA_MENU_TITLE}>
+                        Location
+                      </DropdownMenuLabel>
+                      {/* Parent folder */}
+                      <DropdownMenuItem
+                        onClick={() => handleOpenLocation(displayProjectName)}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <Folder className={FLORA_MENU_ICON} />
+                        <MD tag="span" className="!text-foreground truncate">{displayProjectName}</MD>
+                      </DropdownMenuItem>
+                      {/* Subfolder — the elbow marks it as nested inside the folder above */}
+                      <DropdownMenuItem
+                        onClick={() => handleOpenLocation(displaySubprojectName)}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1 pl-3">
+                          <NestedInParent className={FLORA_MENU_ICON} aria-hidden="true" />
+                          <Folder className={FLORA_MENU_ICON} />
+                        </span>
+                        <MD tag="span" className="!text-foreground truncate">{displaySubprojectName}</MD>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  )}
+                  {isEditing ? (
                     <span
-                      className="flex h-6 w-6 items-center justify-center rounded text-[#68737d] hover:text-foreground hover:bg-muted/50 transition-colors cursor-default"
-                      aria-label="Dashboard location"
+                      className="group/name flex items-center gap-1 cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors"
+                      onClick={() => setIsEditingTitle(true)}
                     >
-                      <Folder className={FLORA_ICON} />
+                      <span className="text-foreground">{editedTitle}</span>
+                      <Edit2 className={`${FLORA_ICON} opacity-0 group-hover/name:opacity-100 transition-opacity`} />
                     </span>
-                  </FloraTooltip>
-                  <span className="text-[#68737d] select-none">/</span>
-                  <span
-                    className="group/name flex items-center gap-1 cursor-pointer hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors"
-                    onClick={() => setIsEditingTitle(true)}
-                  >
-                    <span className="text-foreground">{editedTitle}</span>
-                    <Edit2 className={`${FLORA_ICON} opacity-0 group-hover/name:opacity-100 transition-opacity`} />
-                  </span>
+                  ) : (
+                    <span className="flex items-center gap-1 px-1.5 py-0.5">
+                      <span className="text-foreground">{editedTitle}</span>
+                      <FloraTooltip
+                        content={isStarred ? 'Remove from starred' : 'Add to starred'}
+                        placement="bottom"
+                        size="small"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setIsStarred((prev) => !prev)}
+                          aria-label={isStarred ? 'Remove from starred' : 'Add to starred'}
+                          aria-pressed={isStarred}
+                          className="ml-0.5 flex h-6 w-6 items-center justify-center rounded hover:bg-muted/50 transition-colors cursor-pointer"
+                        >
+                          {isStarred ? (
+                            <Star className={FLORA_ICON} style={{ color: '#eba30b' }} />
+                          ) : (
+                            <StarStroke className={FLORA_ICON} />
+                          )}
+                        </button>
+                      </FloraTooltip>
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -3000,7 +4007,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       <Bookmark className={FLORA_ICON} style={{ width: 16, height: 16 }} />
                       <span className="flex h-5 items-center gap-1 rounded bg-[#e4f2fb] pl-1.5 pr-1 text-[12px] font-normal leading-4 text-[#1f73b7]">
                         <DropdownMenuTrigger asChild>
-                          <button type="button" aria-label="Saved views" className="flex items-center">
+                          <button
+                            type="button"
+                            aria-label="Saved views"
+                            className="flex items-center text-[12px] font-normal leading-4"
+                          >
                             {savedFilteredViews.find(v => v.id === activeBookmarkId)?.name}
                           </button>
                         </DropdownMenuTrigger>
@@ -3034,6 +4045,9 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     </DropdownMenuTrigger>
                   )}
                   <DropdownMenuContent align="start" className="w-56">
+                    <DropdownMenuLabel className={FLORA_MENU_TITLE}>
+                      Saved views
+                    </DropdownMenuLabel>
                     <DropdownMenuItem
                       onClick={handleClearSavedView}
                       className={`flex items-center gap-2 ${!activeBookmarkId ? 'bg-[#1f73b7]/10 focus:bg-[#1f73b7]/15 data-[highlighted]:bg-[#1f73b7]/15' : ''}`}
@@ -3080,8 +4094,6 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <div className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-
                 <DropdownMenu open={isRateMenuOpen} onOpenChange={setIsRateMenuOpen}>
                   <div className="flex h-[32px] shrink-0 items-center rounded-[8px] border border-[#dcdcda] bg-white overflow-hidden">
                     <FloraTooltip content="Refresh data now" placement="bottom" size="small">
@@ -3091,7 +4103,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         aria-label="Refresh data now"
                         className="flex h-full items-center px-2 hover:bg-[#f8f9f9] transition-colors"
                       >
-                        <RefreshCw className={FLORA_ICON} style={{ width: 16, height: 16 }} />
+                        <ArrowRotateRight className={FLORA_ICON} style={{ width: 16, height: 16 }} />
                       </button>
                     </FloraTooltip>
                     <div className="h-5 w-px shrink-0 bg-[#dcdcda]" aria-hidden="true" />
@@ -3224,16 +4236,6 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       <RedoReturn className={FLORA_HEADER_ICON} />
                     </IconButton>
                   </FloraTooltip>
-                  <FloraTooltip content="Revert changes" placement="bottom" size="small">
-                    <IconButton
-                      isPill
-                      size="small"
-                      onClick={() => console.log('Revert changes')}
-                      aria-label="Revert"
-                    >
-                      <RefreshCw className={FLORA_HEADER_ICON} />
-                    </IconButton>
-                  </FloraTooltip>
                 </div>
               )}
               <FloraButton
@@ -3251,6 +4253,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 {isEditing ? 'Editing' : 'Viewing'}
               </FloraButton>
               {isEditing ? (
+              <>
               <SplitButton className="flora-split-button">
                 <FloraButton
                   isPrimary
@@ -3271,28 +4274,41 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     if (changes.value === 'save-as') {
                       console.log('Save as');
                     }
-                    if (changes.value === 'version-history') {
-                      setShowVersionHistory(true);
-                    }
-                    if (changes.value === 'archive') {
-                      console.log('Archive');
-                    }
                   }}
                   button={(props) => (
                     <ChevronButton {...props} isPrimary isPill={false} size="small" />
                   )}
                 >
                   <Item value="save-as">
-                    <MD tag="span" className="!text-foreground">Save dashboard as a new</MD>
-                  </Item>
-                  <Item value="version-history">
-                    <MD tag="span" className="!text-foreground">Version history</MD>
-                  </Item>
-                  <Item value="archive">
-                    <MD tag="span" className="!text-foreground">Archive</MD>
+                    <MD tag="span" className="!text-foreground">Save as new</MD>
                   </Item>
                 </Menu>
               </SplitButton>
+              {/* Dashboard-level actions that aren't saving live in their own overflow menu */}
+              <DropdownMenu>
+                <FloraTooltip content="More options" placement="bottom" size="small">
+                  <DropdownMenuTrigger asChild>
+                    <IconButton isPill size="small" aria-label="More dashboard options" className="shrink-0">
+                      <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                    </IconButton>
+                  </DropdownMenuTrigger>
+                </FloraTooltip>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem className="gap-2" onClick={() => setShowVersionHistory(true)}>
+                    <History className={FLORA_MENU_ICON} />
+                    <MD tag="span" className="!text-foreground">Version history</MD>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2" onClick={() => setShowRevertModal(true)}>
+                    <UndoReturn className={FLORA_MENU_ICON} />
+                    <MD tag="span" className="!text-foreground">Revert all changes</MD>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onClick={() => console.log('Archive')}>
+                    <MD tag="span" className="!text-destructive">Archive</MD>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              </>
               ) : (
               <SplitButton className="flora-split-button">
                 <FloraButton
@@ -3347,7 +4363,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     excludeTypeIds={activeFilters.map((f) => f.typeId)}
                   />
                 ) : (
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center" aria-hidden>
+                  <span className="flex h-[32px] w-[32px] shrink-0 items-center justify-center" aria-hidden>
                     <Filter className={`${FLORA_HEADER_ICON} !text-[#646864]`} />
                   </span>
                 )}
@@ -3366,7 +4382,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
 
             {/* Event filter chip (from Figma) — sits next to the default time filter */}
             {showEventFilter && (
-              <div className="inline-flex h-8 w-fit shrink-0 items-center gap-2 rounded-[8px] border border-[#dcdcda] bg-white px-2">
+              <div className="inline-flex h-[32px] w-fit shrink-0 items-center gap-2 rounded-[8px] border border-[#dcdcda] bg-white px-2">
                 <FloraTooltip content="Cross filter" placement="bottom" size="small">
                   <span className="inline-flex shrink-0">
                     <CheckSquareStroke className="text-[#2f3130]" style={{ width: 16, height: 16 }} aria-hidden />
@@ -3406,14 +4422,16 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     <MD tag="span" className="!text-foreground">Link filters</MD>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem
-                  className="gap-2"
-                  disabled={activeFilters.length === 0}
-                  onClick={handleResetFilters}
-                >
-                  <RefreshCw className={FLORA_MENU_ICON} />
-                  <MD tag="span" className="!text-foreground">Revert filters</MD>
-                </DropdownMenuItem>
+                {!isEditing && (
+                  <DropdownMenuItem
+                    className="gap-2"
+                    disabled={activeFilters.length === 0}
+                    onClick={handleResetFilters}
+                  >
+                    <UndoReturn className={FLORA_MENU_ICON} />
+                    <MD tag="span" className="!text-foreground">Reset filters</MD>
+                  </DropdownMenuItem>
+                )}
                 {isEditing && (
                   <DropdownMenuItem className="gap-2" onClick={() => console.log('Create filter set')}>
                     <Filter className={FLORA_MENU_ICON} />
@@ -3498,7 +4516,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               // Text items render as a bare, editable box with a floating toolbar
               if (item.type === 'text') {
                 const isTextEditing = editingTextId === item.id;
-                const isTextSelected = selectedItemId === item.id;
+                // Selection is an authoring affordance — view mode never shows it
+                const isTextSelected = isEditing && selectedItemId === item.id;
                 const toolbarBelow = item.position.y < 60; // flip toolbar below when near the top
                 const align = item.content?.align || 'left';
                 const textSize = item.content?.fontSize || 16;
@@ -3518,7 +4537,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       width: item.size.width,
                       height: item.content?.style?.resized ? item.size.height : undefined,
                     }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                    onClick={(e) => { e.stopPropagation(); if (isEditing) setSelectedItemId(item.id); }}
                   >
                     {/* Floating contextual toolbar */}
                     {isEditing && (isTextEditing || isTextSelected) && (
@@ -3776,11 +4795,14 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           rows={1}
                           className={`w-full resize-none rounded-[16px] px-3 py-2 leading-snug text-foreground placeholder:text-[#a3a3a3] focus:outline-none transition-colors ${ts.resized ? 'h-full' : ''} ${
                             isTextEditing ? 'ring-1 ring-[#1f73b7] shadow-[0_0_0_2px_rgba(31,115,183,0.15)]' : ''
-                          } ${item.content?.bold ? 'font-semibold' : 'font-normal'}`}
+                          } ${item.content?.fontWeight ? '' : item.content?.bold ? 'font-semibold' : 'font-normal'}`}
                           style={{
                             textAlign: (item.content?.align || 'left') as any,
                             textDecoration: (item.content?.underline || item.content?.link) ? 'underline' : 'none',
                             fontSize: `${item.content?.fontSize || 16}px`,
+                            // An explicit weight wins over the bold toggle, so a
+                            // heading can sit at medium instead of semibold.
+                            fontWeight: item.content?.fontWeight,
                             color: item.content?.color || (item.content?.link ? '#1f73b7' : undefined),
                             backgroundColor: tBg,
                             border: tBorder ? `${tBorderWidth}px solid ${tBorderColor}` : (isTextEditing ? undefined : '1px solid transparent'),
@@ -3802,7 +4824,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 const secBorderColor = secStyle.borderColor || '#D8DCDE';
                 const secBorderWidth = secStyle.borderWidth ?? 1;
                 const secBg = secStyle.bgColor || '#FFFFFF';
-                const isSecSelected = selectedItemId === item.id;
+                const isSecSelected = isEditing && selectedItemId === item.id;
                 return (
                   <div
                     key={item.id}
@@ -3815,7 +4837,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       backgroundColor: secBg,
                       border: secBorder ? `${secBorderWidth}px solid ${secBorderColor}` : 'none',
                     }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                    onClick={(e) => { e.stopPropagation(); if (isEditing) setSelectedItemId(item.id); }}
                   >
                     {isEditing && isSecSelected && (
                       <ResizeHandles onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
@@ -3840,7 +4862,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 const sepStyle = item.content?.style || {};
                 const sepWeight = sepStyle.borderWidth ?? 2;
                 const sepColor = sepStyle.borderColor || '#5C6970';
-                const isSepSelected = selectedItemId === item.id;
+                const isSepSelected = isEditing && selectedItemId === item.id;
                 return (
                   <div
                     key={item.id}
@@ -3851,7 +4873,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       width: item.size.width,
                       height: item.size.height,
                     }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                    onClick={(e) => { e.stopPropagation(); if (isEditing) setSelectedItemId(item.id); }}
                   >
                     <div
                       className="w-full rounded-full"
@@ -3870,7 +4892,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           <DropdownMenuTrigger asChild>
                             <button
                               className="flex h-8 items-center gap-1 rounded-[8px] px-2 text-sm text-foreground transition-colors hover:bg-muted"
-                              aria-label="Separator weight"
+                              aria-label="Line weight"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <span className="inline-block w-5 rounded-full" style={{ height: Math.min(sepWeight, 6), backgroundColor: '#1C2227' }} />
@@ -3891,7 +4913,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                                     if (!Number.isNaN(n)) handleUpdateTextContent(item.id, { style: { ...sepStyle, borderWidth: Math.max(1, Math.min(20, n)) } });
                                   }}
                                   className="h-7 w-12 rounded-[8px] bg-transparent px-2 text-sm text-foreground [appearance:textfield] focus:outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                  aria-label="Separator weight in pixels"
+                                  aria-label="Line weight in pixels"
                                 />
                                 <span className="pr-2 text-xs text-muted-foreground">px</span>
                               </div>
@@ -3904,7 +4926,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           <DropdownMenuTrigger asChild>
                             <button
                               className="flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors hover:bg-muted"
-                              aria-label="Separator color"
+                              aria-label="Line color"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <span className="flex h-4 w-4 items-center justify-center rounded-full border border-[#dcdcda]" style={{ backgroundColor: sepColor }} />
@@ -3923,7 +4945,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         <button
                           className="flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors hover:bg-[#c72a1c]/10"
                           onClick={(e) => { e.stopPropagation(); setContentItems(items => items.filter(i => i.id !== item.id)); }}
-                          aria-label="Delete separator"
+                          aria-label="Delete line"
                         >
                           <Trash2 className="size-[16px] shrink-0" style={{ width: 16, height: 16, color: '#c72a1c' }} />
                         </button>
@@ -4006,7 +5028,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               const wBorderColor = wstyle.borderColor || '#e5e7eb';
               const wBorderWidth = wstyle.borderWidth ?? 1;
               const wBg = wstyle.bgColor || '#ffffff';
-              const isWidgetSelected = selectedItemId === item.id;
+              // A widget sitting directly on a section tint has no surface and no
+              // ring of its own, so it has to carry its own breathing room — there
+              // is no card edge to do that work for it.
+              const isSectionWidget = item.type !== 'image' && wBg === 'transparent' && !wBorder;
+              const isWidgetSelected = isEditing && selectedItemId === item.id;
               return (
               <div
                 key={item.id}
@@ -4040,10 +5066,31 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   </div>
                 )}
                 <div
-                  className={`h-full flex flex-col rounded-[16px] overflow-hidden ${item.type === 'image' ? (wBorder || wBg !== 'transparent' ? 'p-2' : 'p-0') : 'p-3'}`}
+                  className={`h-full flex flex-col rounded-[16px] overflow-hidden ${
+                    item.type === 'image'
+                      ? (wBorder || wBg !== 'transparent' ? 'p-2' : 'p-0')
+                      : isSectionWidget
+                        // Section widgets sit on a tint with no card edge of their
+                        // own, so they carry the breathing room themselves — most
+                        // of it below the body, which is where bands ran tight.
+                        ? 'px-3 pt-3 pb-7'
+                        : 'p-3'
+                  }`}
                   style={{ backgroundColor: wBg }}
                 >
-                  <div className={`flex items-center justify-between gap-2 ${item.type === 'image' ? 'hidden' : 'mb-2'}`}>
+                  {/* Narrative, callout and action widgets draw their own heading,
+                      so the standard widget title row is suppressed for them. */}
+                  <div
+                    className={`flex items-center justify-between gap-2 ${
+                      item.type === 'image' ||
+                      isServiceOpsChromeless(item.content?.chartType) ||
+                      isMonitoringChromeless(item.content?.chartType)
+                        ? 'hidden'
+                        : isSectionWidget
+                          ? 'mb-5'
+                          : 'mb-2'
+                    }`}
+                  >
                     <div className="flex min-w-0 flex-1 items-center gap-2 pl-3 pt-3">
                       {/* Live data indicator */}
                       {item.content?.liveData && (
@@ -4055,7 +5102,9 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           placement="bottom"
                           size="small"
                         >
-                          <span className="min-w-0 truncate text-foreground text-base">
+                          {/* Widget titles rank by size, not weight: medium at
+                              18px reads as a heading without shouting. */}
+                          <span className="min-w-0 truncate text-foreground text-[18px] font-medium">
                             {item.title}
                           </span>
                         </FloraTooltip>
@@ -4119,7 +5168,13 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`h-7 w-7 p-0 ${FLORA_ICON_BTN}`}
+                                // View mode keeps the canvas clean: the overflow menu only
+                                // appears on hover (or while focused / open).
+                                className={`h-7 w-7 p-0 ${FLORA_ICON_BTN} ${
+                                  isEditing
+                                    ? ''
+                                    : 'opacity-0 transition-opacity group-hover/widget:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100'
+                                }`}
                                 onClick={(e) => e.stopPropagation()}
                                 aria-label="Report actions"
                               >
@@ -4166,6 +5221,17 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     </div>
                   </div>
                   
+                  {/* Service-operations widgets (KPI tiles, narratives, charts,
+                      ranked tables, callouts) render from their own module. */}
+                  {isServiceOpsChart(item.content?.chartType) && (
+                    <ServiceOpsChart content={item.content} />
+                  )}
+
+                  {/* Support operations monitoring widgets. */}
+                  {isMonitoringChart(item.content?.chartType) && (
+                    <MonitoringChart content={item.content} />
+                  )}
+
                   {/* Chart content */}
                   {item.content?.chartType === 'line-chart' && (
                     <div className="flex-1 pt-4 pb-2 px-2">
@@ -4808,6 +5874,37 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
             <Modal.FooterItem>
               <FloraButton isPrimary disabled={!saveForm.name.trim()} onClick={handleConfirmSaveDashboard}>
                 Save dashboard
+              </FloraButton>
+            </Modal.FooterItem>
+          </Modal.Footer>
+          <Modal.Close aria-label="Close" />
+        </Modal>
+      )}
+
+      {showRevertModal && (
+        <Modal onClose={() => setShowRevertModal(false)} restoreFocus>
+          <Modal.Header tag="h2" isDanger>Revert all changes?</Modal.Header>
+          <Modal.Body>
+            <MD tag="p" className="!text-foreground">
+              This discards every change you have made since the last save. You cannot undo this.
+            </MD>
+          </Modal.Body>
+          <Modal.Footer>
+            <Modal.FooterItem>
+              <FloraButton onClick={() => setShowRevertModal(false)}>
+                Cancel
+              </FloraButton>
+            </Modal.FooterItem>
+            <Modal.FooterItem>
+              <FloraButton
+                isPrimary
+                isDanger
+                onClick={() => {
+                  console.log('Revert all changes');
+                  setShowRevertModal(false);
+                }}
+              >
+                Revert all changes
               </FloraButton>
             </Modal.FooterItem>
           </Modal.Footer>

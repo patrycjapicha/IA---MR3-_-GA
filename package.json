@@ -45,7 +45,7 @@
     "@radix-ui/react-toggle": "1.1.2",
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
-    "@zendesk-ui/assets": "*",
+    "@zendesk-ui/assets": "^3.1.0",
     "@zendesk-ui/navigation": "*",
     "@zendesk-ui/product-tray": "*",
     "@zendesk-ui/react-components": "*",

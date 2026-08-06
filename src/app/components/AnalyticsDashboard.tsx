@@ -47,7 +47,6 @@ import { ExportDataDialog } from './ExportDataDialog';
 import { ExportDataSection } from './ExportDataSection';
 import { DatasetsSection } from './DatasetsSection';
 import { ResolutionTimeMonitoring } from './ResolutionTimeMonitoring';
-import { RealTimeMonitoring } from './RealTimeMonitoring';
 import { DashboardBuilder } from './DashboardBuilder';
 import { HomeSection } from './HomeSection';
 import { AlertsSection } from './AlertsSection';
@@ -76,6 +75,8 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
   const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set([1]));
   const [activeNavItem, setActiveNavItem] = useState(initialSection || 'search');
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+  // Project the library should open on arrival (set by the dashboard location menu)
+  const [pendingProjectName, setPendingProjectName] = useState<string | null>(null);
   const [expandedQuestionTabs, setExpandedQuestionTabs] = useState<Set<string>>(new Set(['performance', 'issues', 'trends']));
   const [selectedInsight, setSelectedInsight] = useState<MemoryInsight | null>(null);
   const [showInsightDetail, setShowInsightDetail] = useState(false);
@@ -248,11 +249,22 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
     setShowInsightDetail(true);
   };
 
+  // Leave whatever is open and land in the library with the given project opened.
+  // onNavigateToSection deactivates the current tab so the builder stops rendering.
+  const handleNavigateToProject = (projectName: string) => {
+    setPendingProjectName(projectName);
+    setActiveNavItem('library');
+    onNavigateToSection?.('library');
+  };
+
   // Check if there's an active tab that needs a builder
   const activeTab = activeTabId ? openTabs?.find(tab => tab.id === activeTabId && tab.isActive) : null;
   
-  // Check if we need to show a pre-created dashboard (only for specific named dashboards)
-  const preCreatedDashboardNames = ['Resolution Time Monitoring', 'Real-time Monitoring', 'Customer Satisfaction Trends', 'Agent Productivity Dashboard'];
+  // Check if we need to show a pre-created dashboard (only for specific named dashboards).
+  // 'Real-time Monitoring' is deliberately not in this list: it now opens in the
+  // dashboard builder as real dashboard content, so it gets tabs, edit mode and
+  // the builder's global filter bar instead of a bespoke page.
+  const preCreatedDashboardNames = ['Resolution Time Monitoring', 'Customer Satisfaction Trends', 'Agent Productivity Dashboard'];
   const showPreCreatedDashboard = activeTab && activeTab.type === 'dashboard' && activeTab.data?.isNew === false && activeTab.data?.dashboardName && preCreatedDashboardNames.includes(activeTab.data.dashboardName);
   
   // Show dashboard builder for new dashboards OR existing dashboards without specific components
@@ -279,9 +291,6 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
           <div className="flex-1 overflow-auto bg-white rounded-[24px] m-1">
             {dashboardName === 'Resolution Time Monitoring' && (
               <ResolutionTimeMonitoring onOpenAssistant={() => setShowAssistant(true)} />
-            )}
-            {dashboardName === 'Real-time Monitoring' && (
-              <RealTimeMonitoring onOpenAssistant={() => setShowAssistant(true)} />
             )}
             {dashboardName === 'Customer Satisfaction Trends' && (
               <ResolutionTimeMonitoring onOpenAssistant={() => setShowAssistant(true)} />
@@ -342,6 +351,7 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
             initialData={activeTab?.data}
             isFromCard={activeTab?.data?.fromCard || false}
             onOpenAnalyticsAssistant={onOpenAnalyticsAssistant}
+            onNavigateToProject={handleNavigateToProject}
           />
           </div>
         </div>
@@ -513,7 +523,8 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
     );
   }
 
-  // Monitoring Home section
+  // Monitoring Home section — intentionally empty for now. The nav item and
+  // sidebar stay in place; the content area is a blank canvas.
   if (activeNavItem === 'monitoring-home') {
     return (
       <div className="h-full bg-[#F7F7F7]">
@@ -526,10 +537,8 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
             setIsNavCollapsed={setIsNavCollapsed}
           />
 
-          {/* Main Content - Monitoring Home */}
-          <div className="flex-1 overflow-auto bg-white rounded-[24px] m-1">
-            <RealTimeMonitoring onOpenAssistant={() => setShowAssistant(true)} />
-          </div>
+          {/* Main Content - Monitoring Home (empty) */}
+          <div className="flex-1 min-w-0 overflow-hidden m-1 bg-white rounded-[24px]" />
         </div>
       </div>
     );
@@ -553,6 +562,8 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
             onOpenDashboard={onOpenDashboard}
             isNavCollapsed={isNavCollapsed}
             setIsNavCollapsed={setIsNavCollapsed}
+            initialProjectName={pendingProjectName || undefined}
+            onInitialProjectOpened={() => setPendingProjectName(null)}
           />
         </div>
       </div>

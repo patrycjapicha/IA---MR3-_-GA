@@ -11,6 +11,10 @@ test-results/
 playwright-report/
 blob-report/
 .playwright/
+.playwright-mcp/
+
+# Ad-hoc screenshots taken while iterating on the UI
+/*.png
 
 # Logs
 *.log

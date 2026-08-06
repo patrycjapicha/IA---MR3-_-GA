@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button as FloraButton, IconButton, MD, SM, Menu, Item, ItemGroup } from '@zendesk-ui/react-components';
+import { Button as FloraButton, IconButton, MD, SM, Menu, Item, ItemGroup, Tooltip as FloraTooltip } from '@zendesk-ui/react-components';
 import { FloraSearchInput } from './FloraSearchInput';
 import { Button } from './ui/button';
 import {
@@ -30,6 +30,53 @@ const FLORA_HEADER_CLASS =
   'sticky top-0 z-50 relative flex items-center py-[8px] pr-[8px] pl-0 gap-[8px] box-border whitespace-nowrap bg-[#F7F7F7] shrink-0';
 const FLORA_HEADER_CONTROL = 'h-[32px] shrink-0';
 const FLORA_TAB = FLORA_RECT_RADIUS;
+
+// Tab titles are clamped to 120px. The tooltip only earns its place when the
+// name is actually cut off, so measure the rendered span and show the tooltip
+// only when the text overflows.
+function TruncatedTabTitle({ title, className }: { title: string; className?: string }) {
+  const spanRef = React.useRef<HTMLSpanElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  React.useLayoutEffect(() => {
+    const el = spanRef.current;
+    if (!el) return;
+    const measure = () => {
+      const node = spanRef.current;
+      if (node) setIsTruncated(node.scrollWidth > node.clientWidth + 1);
+    };
+    measure();
+    // The clamped span is always 120px wide, so a ResizeObserver on it never
+    // fires again. Re-measure once layout settles and once webfonts land, since
+    // both change the text's rendered width.
+    const raf = requestAnimationFrame(measure);
+    document.fonts?.ready.then(measure).catch(() => {});
+    // The tab strip is what actually reflows as tabs open and close.
+    const strip = el.closest('.dashboard-tab-strip');
+    const observer = strip ? new ResizeObserver(measure) : null;
+    if (strip && observer) observer.observe(strip);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, [title]);
+
+  // The measured span keeps its own ref, so the tooltip gets a separate wrapper
+  // to clone its ref onto.
+  const label = (
+    <span ref={spanRef} className="block truncate max-w-[120px]">
+      <MD tag="span" className={className}>{title}</MD>
+    </span>
+  );
+
+  if (!isTruncated) return label;
+
+  return (
+    <FloraTooltip content={title} placement="bottom" size="small">
+      <span className="flex min-w-0">{label}</span>
+    </FloraTooltip>
+  );
+}
 
 interface SlackNotification {
   id: number;
@@ -393,7 +440,7 @@ Automate this action with a trigger to reduce manual triage and help improve res
 
         {/* Asset tabs */}
         {openTabs.length > 0 && (
-          <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
+          <div className="dashboard-tab-strip flex items-center gap-2 min-w-0 overflow-x-auto">
             {openTabs.map((tab) => (
               <div
                 key={tab.id}
@@ -414,7 +461,10 @@ Automate this action with a trigger to reduce manual triage and help improve res
                   ) : (
                     <BarChart3Stroke className={`${FLORA_TAB_ICON} ${tab.isActive ? 'text-white' : 'text-muted-foreground'}`} />
                   )}
-                  <MD tag="span" className={`truncate max-w-[120px] ${tab.isActive ? '!text-white' : '!text-foreground'}`}>{tab.title}</MD>
+                  <TruncatedTabTitle
+                    title={tab.title}
+                    className={tab.isActive ? '!text-white' : '!text-foreground'}
+                  />
                 </button>
                 <button
                   type="button"

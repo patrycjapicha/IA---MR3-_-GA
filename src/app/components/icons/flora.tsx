@@ -87,6 +87,7 @@ import LayoutStrokeIcon from '@zendesk-ui/assets/icons/20px/layout-grid-stroke.s
 import LightbulbIcon from '@zendesk-ui/assets/icons/20px/lightbulb-fill.svg?react';
 import LineChartIcon from '@zendesk-ui/assets/icons/20px/line-graph-square-fill.svg?react';
 import LineChartStrokeIcon from '@zendesk-ui/assets/icons/20px/line-graph-square-stroke.svg?react';
+import LineIcon from '@zendesk-ui/assets/icons/20px/horizontal-rule.svg?react';
 import LinkIcon from '@zendesk-ui/assets/icons/20px/chain.svg?react';
 import ListIcon from '@zendesk-ui/assets/icons/20px/list-bullet.svg?react';
 import LogOutIcon from '@zendesk-ui/assets/icons/20px/arrow-left.svg?react';
@@ -156,6 +157,10 @@ import ImageStrokeIcon from '@zendesk-ui/assets/icons/20px/image-stroke.svg?reac
 import Undo2Icon from '@zendesk-ui/assets/icons/20px/arrow-reverse-fill.svg?react';
 import Undo2StrokeIcon from '@zendesk-ui/assets/icons/20px/arrow-reverse-stroke.svg?react';
 import Redo2Icon from '@zendesk-ui/assets/icons/20px/arrow-rotate-right.svg?react';
+import ArrowRotateRightIcon from '@zendesk-ui/assets/icons/20px/arrow-rotate-right.svg?react';
+import TerminalStrokeIcon from '@zendesk-ui/assets/icons/20px/terminal-stroke.svg?react';
+import UndoReturnIcon from '@zendesk-ui/assets/icons/20px/arrow-curve-left.svg?react';
+import RedoReturnIcon from '@zendesk-ui/assets/icons/20px/arrow-curve-right.svg?react';
 import GlobeIcon from '@zendesk-ui/assets/icons/20px/globe-fill.svg?react';
 import Grid3X3Icon from '@zendesk-ui/assets/icons/20px/grid-3x3-fill.svg?react';
 import Grid3X3StrokeIcon from '@zendesk-ui/assets/icons/20px/grid-3x3-stroke.svg?react';
@@ -193,20 +198,15 @@ const ArrowRightIcon = (props: SVGProps<SVGSVGElement>) => (
   <ArrowLeftIcon {...props} style={{ transform: 'scaleX(-1)', ...props.style }} />
 );
 
-const UndoReturnIcon = (props: SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" focusable="false" {...props}>
+// Tree elbow ("└") marking an item as nested inside the one above it. Flora has
+// no equivalent glyph, so it is drawn here to match the 20px icon grid.
+const NestedInParentIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" focusable="false" viewBox="0 0 20 20" fill="none" {...props}>
     <path
-      fill="currentColor"
-      d="M6.07733 3.57722C6.40277 3.25179 6.93061 3.25179 7.25604 3.57722C7.58134 3.90267 7.58143 4.43054 7.25604 4.75593L5.34491 6.66609H15.0002C16.3808 6.66612 17.5001 7.7855 17.5002 9.16609V15.8331C17.5001 16.2931 17.1272 16.6659 16.6672 16.6661C16.207 16.6661 15.8333 16.2932 15.8332 15.8331V9.16609C15.8331 8.70595 15.4603 8.33312 15.0002 8.33308H5.34491L7.25604 10.2442C7.58114 10.5696 7.58127 11.0966 7.25604 11.4219C6.93063 11.7474 6.40277 11.7473 6.07733 11.4219L2.74432 8.08894C2.41888 7.7635 2.41888 7.23567 2.74432 6.91023L6.07733 3.57722Z"
-    />
-  </svg>
-);
-
-const RedoReturnIcon = (props: SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" focusable="false" {...props}>
-    <path
-      fill="currentColor"
-      d="M13.9227 3.57722C13.5972 3.25179 13.0694 3.25179 12.744 3.57722C12.4187 3.90267 12.4186 4.43054 12.744 4.75593L14.6551 6.66609H4.99982C3.61917 6.66612 2.49992 7.7855 2.49982 9.16609V15.8331C2.49992 16.2931 2.87284 16.6659 3.33283 16.6661C3.793 16.6661 4.1667 16.2932 4.16681 15.8331V9.16609C4.16692 8.70595 4.53966 8.33312 4.99982 8.33308H14.6551L12.744 10.2442C12.4189 10.5696 12.4187 11.0966 12.744 11.4219C13.0694 11.7474 13.5972 11.7473 13.9227 11.4219L17.2557 8.08894C17.5811 7.7635 17.5811 7.23567 17.2557 6.91023L13.9227 3.57722Z"
+      d="M6.5 3.75v6.75a2 2 0 0 0 2 2h5"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
     />
   </svg>
 );
@@ -295,6 +295,7 @@ export const Layers = LayersIcon;
 export const Layout = LayoutIcon;
 export const LayoutStroke = LayoutStrokeIcon;
 export const Lightbulb = LightbulbIcon;
+export const Line = LineIcon;
 export const LineChart = LineChartIcon;
 export const LineChartStroke = LineChartStrokeIcon;
 export const Link = LinkIcon;
@@ -319,6 +320,7 @@ export const MessageSquare = MessageSquareIcon;
 export const Mic = MicIcon;
 export const Monitor = MonitorIcon;
 export const MoreVertical = MoreVerticalIcon;
+export const NestedInParent = NestedInParentIcon;
 export const Package = PackageIcon;
 export const Paperclip = PaperclipIcon;
 export const Pause = PauseIcon;
@@ -348,6 +350,8 @@ export const floraSearchInputWrapperStyle = (width: number | string = '100%') =>
   boxSizing: 'border-box' as const,
 });
 export const RefreshCw = RefreshCwIcon;
+export const ArrowRotateRight = ArrowRotateRightIcon;
+export const TerminalStroke = TerminalStrokeIcon;
 export const Save = SaveIcon;
 export const SaveStroke = SaveStrokeIcon;
 export const Search = SearchIconSrc;
