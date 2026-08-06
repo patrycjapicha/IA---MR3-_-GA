@@ -353,6 +353,24 @@ html {
   height: 16px !important;
 }
 
+/* "Viewing" and "Editing" are different lengths, so pin the toggle's width to
+   the wider label. Without this it resizes and nudges the header on toggle. */
+.dashboard-mode-toggle {
+  width: 95px !important;
+  flex-shrink: 0;
+}
+
+/* Save and Share swap in the same slot, so pin them to one width (the wider
+   of the two labels) and let the label button absorb the difference. */
+.dashboard-primary-split-button {
+  width: 91px !important;
+  flex-shrink: 0;
+}
+
+.dashboard-primary-split-button [data-garden-id='buttons.button'] {
+  flex: 1 1 auto;
+}
+
 .dashboard-reports-modal-body {
   padding-top: 16px !important;
 }

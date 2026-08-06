@@ -3814,12 +3814,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
 
                 {/* Overflow: the remaining insert tools */}
                 <DropdownMenu>
-                  <FloraTooltip content="More tools" placement="bottom" size="small">
+                  <FloraTooltip content="More components" placement="bottom" size="small">
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label="More tools"
+                        aria-label="More components"
                         className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
                       >
                         <ChevronDown className={FLORA_TOOLBAR_ICON} />
@@ -4238,10 +4238,13 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   </FloraTooltip>
                 </div>
               )}
+              {/* The mode toggle keeps a fixed width so swapping the
+                  Viewing/Editing label doesn't shift it. */}
               <FloraButton
                 isPill
                 size="small"
                 onClick={() => setIsEditing(!isEditing)}
+                className="dashboard-mode-toggle"
               >
                 <FloraButton.StartIcon>
                   {isEditing ? (
@@ -4252,9 +4255,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </FloraButton.StartIcon>
                 {isEditing ? 'Editing' : 'Viewing'}
               </FloraButton>
+              {/* Save and Share are the same fixed width and share one slot, and
+                  the overflow slot beside them is always reserved — so switching
+                  mode only makes the overflow button itself appear/disappear. */}
+              <div className="flex shrink-0 items-center gap-2">
               {isEditing ? (
-              <>
-              <SplitButton className="flora-split-button">
+              <SplitButton className="flora-split-button dashboard-primary-split-button">
                 <FloraButton
                   isPrimary
                   isPill={false}
@@ -4284,33 +4290,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   </Item>
                 </Menu>
               </SplitButton>
-              {/* Dashboard-level actions that aren't saving live in their own overflow menu */}
-              <DropdownMenu>
-                <FloraTooltip content="More options" placement="bottom" size="small">
-                  <DropdownMenuTrigger asChild>
-                    <IconButton isPill size="small" aria-label="More dashboard options" className="shrink-0">
-                      <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
-                    </IconButton>
-                  </DropdownMenuTrigger>
-                </FloraTooltip>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem className="gap-2" onClick={() => setShowVersionHistory(true)}>
-                    <History className={FLORA_MENU_ICON} />
-                    <MD tag="span" className="!text-foreground">Version history</MD>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2" onClick={() => setShowRevertModal(true)}>
-                    <UndoReturn className={FLORA_MENU_ICON} />
-                    <MD tag="span" className="!text-foreground">Revert all changes</MD>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onClick={() => console.log('Archive')}>
-                    <MD tag="span" className="!text-destructive">Archive</MD>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              </>
               ) : (
-              <SplitButton className="flora-split-button">
+              <SplitButton className="flora-split-button dashboard-primary-split-button">
                 <FloraButton
                   isPrimary
                   isPill={false}
@@ -4347,6 +4328,36 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </Menu>
               </SplitButton>
               )}
+              {/* Reserved overflow slot: holds its 32px whether or not the
+                  button is rendered, so nothing beside it moves. */}
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+                {isEditing && (
+                  <DropdownMenu>
+                    <FloraTooltip content="More options" placement="bottom" size="small">
+                      <DropdownMenuTrigger asChild>
+                        <IconButton isPill size="small" aria-label="More dashboard options" className="shrink-0">
+                          <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                        </IconButton>
+                      </DropdownMenuTrigger>
+                    </FloraTooltip>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuItem className="gap-2" onClick={() => setShowVersionHistory(true)}>
+                        <History className={FLORA_MENU_ICON} />
+                        <MD tag="span" className="!text-foreground">Version history</MD>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="gap-2" onClick={() => setShowRevertModal(true)}>
+                        <UndoReturn className={FLORA_MENU_ICON} />
+                        <MD tag="span" className="!text-foreground">Revert all changes</MD>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem variant="destructive" onClick={() => console.log('Archive')}>
+                        <MD tag="span" className="!text-destructive">Archive</MD>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+              </div>
             </div>
           </div>
         </div>
