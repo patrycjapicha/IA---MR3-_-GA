@@ -7,12 +7,24 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build (${{ matrix.name }})
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          # Previous version, frozen at the v1 tag. Served at the site root.
+          - name: v1
+            ref: v1
+          # Current work on main. Served at /v2/.
+          - name: v2
+            ref: main
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -32,14 +44,39 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.name }}
+          path: ./dist
+          retention-days: 1
+
+  package:
+    name: Package site
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download v1 build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-v1
+          path: ./site
+
+      - name: Download v2 build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-v2
+          path: ./site/v2
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./site
 
   deploy:
     name: Deploy
-    needs: build
+    needs: package
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
 
