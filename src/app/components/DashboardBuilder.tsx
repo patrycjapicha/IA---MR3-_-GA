@@ -29,6 +29,7 @@ import {
   LineChartStroke,
   PieChartStroke,
   ActivityStroke,
+  FlowStroke,
   TargetStroke,
   TableStroke,
   Edit2Stroke as Edit2,
@@ -70,7 +71,7 @@ import {
   Palette,
   StopStroke,
   ShapesStroke,
-  SparklesStroke,
+  Sparkles,
   PencilSparkleStroke,
   CheckSquareStroke,
   Copy,
@@ -688,6 +689,8 @@ const toolbarOverflowItems = [
   },
 ];
 
+const ADD_FILTER_SHORTCUT = 'F';
+
 // Tooltip body for a toolbar tool: the name, then its single-letter keyboard
 // shortcut set off to the right the way Flora tooltips carry hint text.
 function toolTooltip(label: string, shortcut?: string) {
@@ -697,6 +700,138 @@ function toolTooltip(label: string, shortcut?: string) {
       <span>{label}</span>
       <span className="text-white/60">{shortcut}</span>
     </span>
+  );
+}
+
+// Suggestions that float over the canvas while editing. Every one adds a report
+// to the dashboard — they're about the data on offer, not about the builder's
+// own tooling, so nothing here points at copilot or the context graph.
+type SuggestionAction = { id: string; label: string; report: Omit<ContentItem, 'id' | 'position'> };
+
+const DASHBOARD_SUGGESTIONS: SuggestionAction[] = [
+  {
+    id: 'csat-comparison',
+    label: 'Add CSAT comparison',
+    report: {
+      type: 'chart',
+      size: { width: 400, height: 280 },
+      title: 'CSAT comparison',
+      content: {
+        chartType: 'csat-comparison',
+        reportSource: 'Customer Satisfaction Analysis',
+        reportType: 'Analytics',
+        description: 'CSAT this period against the previous one, by channel.',
+        style: { shadow: false, border: true },
+      },
+    },
+  },
+  {
+    id: 'resolution-time',
+    label: 'Add median resolution time',
+    report: {
+      type: 'chart',
+      size: { width: 280, height: 200 },
+      title: 'Median resolution time',
+      content: {
+        chartType: 'kpi-resolution-time',
+        reportSource: 'Resolution Time Analysis',
+        reportType: 'KPI',
+        description: 'Median time from ticket creation to solved, business hours only.',
+        kpiData: { averageResolutionTime: '5.8 hours', change: '-36%', trend: 'down' },
+        style: { shadow: false, border: true },
+      },
+    },
+  },
+  {
+    id: 'ticket-volume',
+    label: 'Add ticket volume by day',
+    report: {
+      type: 'chart',
+      size: { width: 440, height: 280 },
+      title: 'Ticket volume by day',
+      content: {
+        chartType: 'ticket-volume',
+        reportSource: 'Customer Support Analytics',
+        reportType: 'Analytics',
+        description: 'Tickets created per day across the reporting period.',
+        style: { shadow: false, border: true },
+      },
+    },
+  },
+  {
+    id: 'recent-tickets',
+    label: 'Add recent tickets table',
+    report: {
+      type: 'chart',
+      size: { width: 460, height: 300 },
+      title: 'Recent tickets',
+      content: {
+        chartType: 'table',
+        reportSource: 'Real-time Monitoring',
+        reportType: 'Analytics',
+        description: 'The most recently updated tickets, with status and assignee.',
+        style: { shadow: false, border: true },
+      },
+    },
+  },
+];
+
+// Chip geometry and colours come from the 🌸 Suggestions component in Figma
+// (Dashboard builder — components, node 37:337): 40px tall, 16/10 padding,
+// 8px gap, pill radius, neutral-700 at 8% ground, accent sparkle.
+const SUGGESTION_CHIP =
+  'flex h-[40px] shrink-0 cursor-pointer items-center justify-center gap-[8px] rounded-[99px] bg-[#64686414] px-[16px] py-[10px] transition-colors hover:bg-[#64686424]';
+
+// The row of suggestion chips that floats in the canvas's bottom-left corner.
+// Applying a chip drops it from the row, so a second click can't add a
+// duplicate report and the row shrinks as the user works through it.
+function DashboardSuggestions({
+  onDismiss,
+  onAction,
+}: {
+  onDismiss: () => void;
+  onAction: (suggestion: SuggestionAction) => void;
+}) {
+  const [used, setUsed] = useState<string[]>([]);
+  const remaining = DASHBOARD_SUGGESTIONS.filter((s) => !used.includes(s.id));
+
+  if (remaining.length === 0) return null;
+
+  return (
+    // The chips sit on one row where there's space and wrap on a narrow canvas,
+    // so the cap tracks the canvas width rather than a fixed pixel figure. The
+    // z-index has to clear the widgets' resize handles (z-110) — the scroll
+    // container isn't a stacking context, so those compete with this directly
+    // and would otherwise swallow clicks on a chip.
+    <div className="pointer-events-auto absolute bottom-4 left-4 z-[120] flex max-w-[calc(100%-32px)] flex-wrap items-center gap-[8px]">
+      {remaining.map((suggestion) => (
+        <button
+          key={suggestion.id}
+          type="button"
+          onClick={() => {
+            onAction(suggestion);
+            setUsed((prev) => [...prev, suggestion.id]);
+          }}
+          className={SUGGESTION_CHIP}
+        >
+          <Sparkles className="size-[20px] shrink-0 !text-[#8d59b1]" aria-hidden />
+          <span className="whitespace-nowrap text-[14px] leading-[20px] tracking-[-0.154px] text-[#2f3130]">
+            {suggestion.label}
+          </span>
+        </button>
+      ))}
+      {/* Not part of the Figma component, but the chips sit over the canvas
+          indefinitely otherwise. Borrows the chip's own shape so it reads as
+          part of the row. */}
+      <button
+        type="button"
+        aria-label="Dismiss suggestions"
+        onClick={onDismiss}
+        className={`${SUGGESTION_CHIP} w-[40px] !px-0`}
+      >
+        <X className="size-[16px] shrink-0 text-[#2f3130]" />
+      </button>
+    </div>
   );
 }
 
@@ -2112,7 +2247,13 @@ function AddFilterMenu({
         if (!nextOpen) setSearch('');
       }}
     >
-      <FloraTooltip content="Add filter" placement="bottom" size="small">
+      {/* bottom-start, not bottom: the icon is the leftmost thing in the filter
+          bar, so a centred tooltip clips against the card's edge. */}
+      <FloraTooltip
+        content={toolTooltip('Add filter', ADD_FILTER_SHORTCUT)}
+        placement="bottom-start"
+        size="small"
+      >
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -3202,6 +3343,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [bookmarkName, setBookmarkName] = useState('');
   const [isSavingAsNew, setIsSavingAsNew] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(false);
+  const [showContextGraph, setShowContextGraph] = useState(false);
+  // Dismissing the canvas tip is sticky for the session — it shouldn't come back
+  // every time the user toggles out of and back into edit mode.
+  const [tipDismissed, setTipDismissed] = useState(false);
   // Reverting throws away unsaved edits, so it asks first.
   const [showRevertModal, setShowRevertModal] = useState(false);
 
@@ -3284,12 +3430,18 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   // Compute a position for a new item so it sits next to the previous one
   // (flows left-to-right and wraps to a new row) instead of stacking on top.
   const CANVAS_MAX_WIDTH = 1200;
-  const getNextPosition = (size: { width: number; height: number }) => {
-    if (contentItems.length === 0) {
+  // `items` defaults to current state, but callers that add inside a functional
+  // setState pass the in-flight list so back-to-back adds don't both position
+  // against the same stale array.
+  const getNextPosition = (
+    size: { width: number; height: number },
+    items: ContentItem[] = contentItems
+  ) => {
+    if (items.length === 0) {
       return { x: CANVAS_WIDGET_PADDING, y: CANVAS_WIDGET_PADDING };
     }
     // Place to the right of the item with the largest right edge on the current top row
-    const last = contentItems[contentItems.length - 1];
+    const last = items[items.length - 1];
     const candidateX = last.position.x + last.size.width + CANVAS_WIDGET_PADDING;
 
     if (candidateX + size.width <= CANVAS_MAX_WIDTH) {
@@ -3297,7 +3449,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     }
 
     // Wrap to a new row below the tallest item so far
-    const nextRowY = contentItems.reduce(
+    const nextRowY = items.reduce(
       (maxBottom, item) => Math.max(maxBottom, item.position.y + item.size.height),
       0
     ) + CANVAS_WIDGET_PADDING;
@@ -3701,6 +3853,21 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     setSelectedTool(null);
   };
 
+  // Applies a canvas suggestion, dropping its report through the same
+  // getNextPosition flow as any manually added one.
+  const handleSuggestionAction = (suggestion: SuggestionAction) => {
+    const id = `${suggestion.id}-${Date.now()}`;
+
+    // Functional update: the chips sit side by side, so two clicks can land in
+    // one render pass — reading `contentItems` directly would drop the first
+    // report and position the second on top of it.
+    setContentItems((prev) => [
+      ...prev,
+      { ...suggestion.report, id, position: getNextPosition(suggestion.report.size, prev) },
+    ]);
+    setSelectedItemId(id);
+  };
+
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Clicking empty canvas deselects any active text editor / selected widget
     if (editingTextId) setEditingTextId(null);
@@ -3784,7 +3951,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           <div className="relative flex items-center justify-between">
             {/* Centered editing toolbar */}
             {isEditing && (
-              <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-[#f3f4f4] px-1.5 py-1">
+              <div className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-[#f7f7f7] px-1.5 py-1">
                 {toolbarItems.map((tool) => (
                   <FloraTooltip
                     key={tool.id}
@@ -3874,6 +4041,35 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     <TerminalStroke className={FLORA_TOOLBAR_ICON} style={{ width: 16, height: 16 }} />
                   </Button>
                 </FloraTooltip>
+
+                <FloraTooltip content="Context graph" placement="bottom" size="small">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Context graph"
+                    aria-expanded={showContextGraph}
+                    onClick={() => setShowContextGraph(true)}
+                    className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
+                  >
+                    <FlowStroke className={FLORA_TOOLBAR_ICON} />
+                  </Button>
+                </FloraTooltip>
+
+                {/* Copilot is an AI affordance rather than an insert tool, so the
+                    violet icon carries the distinction — and its hover state is a
+                    circle rather than the square swatch the other tools use. */}
+                <FloraTooltip content="Edit with copilot" placement="bottom" size="small">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Edit with copilot"
+                    aria-expanded={showCopilot}
+                    onClick={() => setShowCopilot((prev) => !prev)}
+                    className={`h-8 w-8 shrink-0 p-0 ${FLORA_BTN} !rounded-full hover:!bg-[#8d59b1]/10`}
+                  >
+                    <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />
+                  </Button>
+                </FloraTooltip>
               </div>
             )}
             <div className="flex items-center gap-3 group">
@@ -3936,14 +4132,13 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         </button>
                       </DropdownMenuTrigger>
                     </FloraTooltip>
-                    <DropdownMenuContent align="start" className="w-64">
-                      <DropdownMenuLabel className={FLORA_MENU_TITLE}>
-                        Location
-                      </DropdownMenuLabel>
+                    {/* No title row — the trigger's tooltip already names the menu,
+                        so it stays compact: tighter padding and width to fit. */}
+                    <DropdownMenuContent align="start" className="max-w-64 min-w-[10rem] !p-1">
                       {/* Parent folder */}
                       <DropdownMenuItem
                         onClick={() => handleOpenLocation(displayProjectName)}
-                        className="flex items-center gap-2 cursor-pointer"
+                        className="flex items-center gap-2 cursor-pointer !px-2 !py-1"
                       >
                         <Folder className={FLORA_MENU_ICON} />
                         <MD tag="span" className="!text-foreground truncate">{displayProjectName}</MD>
@@ -3951,7 +4146,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       {/* Subfolder — the elbow marks it as nested inside the folder above */}
                       <DropdownMenuItem
                         onClick={() => handleOpenLocation(displaySubprojectName)}
-                        className="flex items-center gap-2 cursor-pointer"
+                        className="flex items-center gap-2 cursor-pointer !px-2 !py-1"
                       >
                         <span className="flex items-center gap-1 pl-3">
                           <NestedInParent className={FLORA_MENU_ICON} aria-hidden="true" />
@@ -4255,15 +4450,15 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </FloraButton.StartIcon>
                 {isEditing ? 'Editing' : 'Viewing'}
               </FloraButton>
-              {/* Save and Share are the same fixed width and share one slot, and
-                  the overflow slot beside them is always reserved — so switching
-                  mode only makes the overflow button itself appear/disappear. */}
+              {/* Save (editing) and Share (viewing) are the same fixed width and
+                  share one slot, with an overflow menu always beside them — so
+                  switching mode swaps labels without shifting anything. */}
               <div className="flex shrink-0 items-center gap-2">
               {isEditing ? (
               <SplitButton className="flora-split-button dashboard-primary-split-button">
                 <FloraButton
                   isPrimary
-                  isPill={false}
+                  isPill
                   size="small"
                   onClick={handleOpenSaveDashboardModal}
                 >
@@ -4282,7 +4477,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     }
                   }}
                   button={(props) => (
-                    <ChevronButton {...props} isPrimary isPill={false} size="small" />
+                    <ChevronButton {...props} isPrimary isPill size="small" />
                   )}
                 >
                   <Item value="save-as">
@@ -4291,71 +4486,59 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 </Menu>
               </SplitButton>
               ) : (
-              <SplitButton className="flora-split-button dashboard-primary-split-button">
-                <FloraButton
-                  isPrimary
-                  isPill={false}
-                  size="small"
-                  onClick={() => console.log('Share dashboard')}
-                >
-                  Share
-                </FloraButton>
-                <Menu
-                  className="flora-split-button-menu"
-                  placement="bottom-end"
-                  hasArrow={false}
-                  appendToNode={typeof document !== 'undefined' ? document.body : undefined}
-                  zIndex={9999}
-                  onChange={(changes) => {
-                    if (changes.type !== 'menuItem:click' || !changes.value) return;
-                    if (changes.value === 'share-link') {
-                      console.log('Share a link');
-                    }
-                    if (changes.value === 'export') {
-                      console.log('Export');
-                    }
-                  }}
-                  button={(props) => (
-                    <ChevronButton {...props} isPrimary isPill={false} size="small" />
-                  )}
-                >
-                  <Item value="share-link">
-                    <MD tag="span" className="!text-foreground">Share a link</MD>
-                  </Item>
-                  <Item value="export">
-                    <MD tag="span" className="!text-foreground">Export</MD>
-                  </Item>
-                </Menu>
-              </SplitButton>
+              /* Share stands alone — its secondary actions moved out to the
+                 overflow menu on the right. */
+              <FloraButton
+                isPrimary
+                isPill
+                size="small"
+                className="dashboard-primary-action-button"
+                onClick={() => console.log('Share dashboard')}
+              >
+                Share
+              </FloraButton>
               )}
-              {/* Reserved overflow slot: holds its 32px whether or not the
-                  button is rendered, so nothing beside it moves. */}
+              {/* Overflow menu — mode-specific contents, but always present so
+                  the slot beside the primary button never changes width. */}
               <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-                {isEditing && (
-                  <DropdownMenu>
-                    <FloraTooltip content="More options" placement="bottom" size="small">
-                      <DropdownMenuTrigger asChild>
-                        <IconButton isPill size="small" aria-label="More dashboard options" className="shrink-0">
-                          <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
-                        </IconButton>
-                      </DropdownMenuTrigger>
-                    </FloraTooltip>
-                    <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem className="gap-2" onClick={() => setShowVersionHistory(true)}>
-                        <History className={FLORA_MENU_ICON} />
-                        <MD tag="span" className="!text-foreground">Version history</MD>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2" onClick={() => setShowRevertModal(true)}>
-                        <UndoReturn className={FLORA_MENU_ICON} />
-                        <MD tag="span" className="!text-foreground">Revert all changes</MD>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem variant="destructive" onClick={() => console.log('Archive')}>
-                        <MD tag="span" className="!text-destructive">Archive</MD>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <DropdownMenu>
+                  <FloraTooltip content="More options" placement="bottom" size="small">
+                    <DropdownMenuTrigger asChild>
+                      <IconButton isPill size="small" aria-label="More dashboard options" className="shrink-0">
+                        <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
+                      </IconButton>
+                    </DropdownMenuTrigger>
+                  </FloraTooltip>
+                  <DropdownMenuContent align="end" className="w-52">
+                    {isEditing ? (
+                      <>
+                        <DropdownMenuItem className="gap-2" onClick={() => setShowVersionHistory(true)}>
+                          <History className={FLORA_MENU_ICON} />
+                          <MD tag="span" className="!text-foreground">Version history</MD>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => setShowRevertModal(true)}>
+                          <UndoReturn className={FLORA_MENU_ICON} />
+                          <MD tag="span" className="!text-foreground">Revert all changes</MD>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem variant="destructive" onClick={() => console.log('Archive')}>
+                          <MD tag="span" className="!text-destructive">Archive</MD>
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem className="gap-2" onClick={() => console.log('Export')}>
+                          <Download className={FLORA_MENU_ICON} />
+                          <MD tag="span" className="!text-foreground">Export</MD>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => console.log('Schedule delivery')}>
+                          <Clock className={FLORA_MENU_ICON} />
+                          <MD tag="span" className="!text-foreground">Schedule delivery</MD>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               </div>
             </div>
@@ -4367,7 +4550,10 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           <div className="flex items-center gap-2">
            <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
             {(activeFilters.length > 0 || isEditing) && (
-              <>
+              /* The filter icon and its overflow menu read as one control, so
+                 they sit 4px apart rather than at the row's 8px rhythm. Gap is
+                 pinned in px because rem spacing scales to the 14px root. */
+              <div className="flex shrink-0 items-center gap-[4px]">
                 {isEditing ? (
                   <AddFilterMenu
                     onAdd={handleAddFilter}
@@ -4378,7 +4564,47 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     <Filter className={`${FLORA_HEADER_ICON} !text-[#646864]`} />
                   </span>
                 )}
-              </>
+
+                {/* Filter options — a small overflow menu sitting directly
+                    beside the filter icon, in both editing and viewing modes. */}
+                <DropdownMenu>
+                  <FloraTooltip content="Filter options" placement="bottom-start" size="small">
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Filter options"
+                        className={`w-[20px] shrink-0 p-0 hover:bg-muted ${FLORA_BTN} !h-[20px]`}
+                      >
+                        <MoreVertical className="!size-[12px] shrink-0 !text-[#646864]" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </FloraTooltip>
+                  <DropdownMenuContent align="start" className="w-48">
+                    {isEditing ? (
+                      <>
+                        <DropdownMenuItem className="gap-2" onClick={() => console.log('Link filters')}>
+                          <Connector className={FLORA_MENU_ICON} />
+                          <MD tag="span" className="!text-foreground">Link filters</MD>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="gap-2" onClick={() => console.log('Create filter set')}>
+                          <Filter className={FLORA_MENU_ICON} />
+                          <MD tag="span" className="!text-foreground">Create filter set</MD>
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <DropdownMenuItem
+                        className="gap-2"
+                        disabled={activeFilters.length === 0}
+                        onClick={handleResetFilters}
+                      >
+                        <UndoReturn className={FLORA_MENU_ICON} />
+                        <MD tag="span" className="!text-foreground">Reset filters</MD>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
 
             {activeFilters.map((filter) => (
@@ -4416,41 +4642,6 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               </div>
             )}
            </div>
-
-            {/* Overflow menu — right side of the filter bar */}
-            <DropdownMenu>
-              <FloraTooltip content="More options" placement="bottom" size="small">
-                <DropdownMenuTrigger asChild>
-                  <IconButton isPill size="small" aria-label="Filter options" className="shrink-0">
-                    <MoreVertical className={FLORA_HEADER_ICON} style={{ width: 16, height: 16 }} />
-                  </IconButton>
-                </DropdownMenuTrigger>
-              </FloraTooltip>
-              <DropdownMenuContent align="end" className="w-48">
-                {isEditing && (
-                  <DropdownMenuItem className="gap-2" onClick={() => console.log('Link filters')}>
-                    <Connector className={FLORA_MENU_ICON} />
-                    <MD tag="span" className="!text-foreground">Link filters</MD>
-                  </DropdownMenuItem>
-                )}
-                {!isEditing && (
-                  <DropdownMenuItem
-                    className="gap-2"
-                    disabled={activeFilters.length === 0}
-                    onClick={handleResetFilters}
-                  >
-                    <UndoReturn className={FLORA_MENU_ICON} />
-                    <MD tag="span" className="!text-foreground">Reset filters</MD>
-                  </DropdownMenuItem>
-                )}
-                {isEditing && (
-                  <DropdownMenuItem className="gap-2" onClick={() => console.log('Create filter set')}>
-                    <Filter className={FLORA_MENU_ICON} />
-                    <MD tag="span" className="!text-foreground">Create filter set</MD>
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
@@ -4501,8 +4692,10 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           </Tabs>
         </div>
 
-        {/* Canvas Area */}
-        <div className="flex-1 overflow-auto" style={{ backgroundColor: CANVAS_BG }}>
+        {/* Canvas Area. The scroll container is nested inside a static wrapper so
+            the floating tip stays pinned to the corner as the canvas scrolls. */}
+        <div className="relative flex-1 min-h-0">
+          <div className="h-full overflow-auto" style={{ backgroundColor: CANVAS_BG }}>
           <div
             className="relative w-full h-full min-h-[600px] cursor-crosshair"
             style={{
@@ -5363,6 +5556,95 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     </div>
                   )}
 
+                  {/* CSAT comparison gets its own block rather than reusing
+                      'bar-chart', whose series are hardcoded to income/expense. */}
+                  {item.content?.chartType === 'csat-comparison' && (
+                    <div className="flex-1 flex flex-col px-5 pt-2 pb-4">
+                      <div className="mb-3 flex items-center gap-1">
+                        <TrendingUp className={FLORA_ICON} />
+                        <span className="text-xs text-muted-foreground">+1.5 pts vs previous period</span>
+                      </div>
+                      <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsBarChart
+                            data={[
+                              { channel: 'Email', current: 91, previous: 88 },
+                              { channel: 'Chat', current: 94, previous: 93 },
+                              { channel: 'Phone', current: 88, previous: 89 },
+                              { channel: 'Messaging', current: 92, previous: 87 },
+                              { channel: 'Web', current: 86, previous: 84 },
+                            ]}
+                            margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+                          >
+                            <XAxis
+                              dataKey="channel"
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fill: '#999', fontSize: 11 }}
+                            />
+                            <YAxis axisLine={false} tickLine={false} tick={false} domain={[70, 100]} />
+                            <Tooltip
+                              formatter={(value: number) => `${value}%`}
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                              }}
+                            />
+                            <Bar dataKey="current" name="This period" fill="#4ade80" radius={[4, 4, 0, 0]} barSize={12} />
+                            <Bar dataKey="previous" name="Previous" fill="#a78bfa" radius={[4, 4, 0, 0]} barSize={12} />
+                          </RechartsBarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex items-center justify-center gap-4 mt-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-[#4ade80]"></div>
+                          <span className="text-xs text-muted-foreground">This period</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-[#a78bfa]"></div>
+                          <span className="text-xs text-muted-foreground">Previous</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ticket volume gets its own block rather than reusing
+                      'active-users', whose footer is a desktop/mobile device
+                      split — meaningless for tickets. */}
+                  {item.content?.chartType === 'ticket-volume' && (
+                    <div className="flex-1 flex flex-col px-5 pt-2 pb-4">
+                      <div className="flex items-baseline gap-2 mb-3">
+                        <h2 className="text-2xl font-semibold text-foreground">12 480</h2>
+                        <span className="text-xs text-muted-foreground">tickets created</span>
+                      </div>
+                      <div className="flex-1">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsBarChart
+                            data={Array.from({ length: 30 }, (_, i) => ({
+                              day: `${i + 1}`,
+                              // A weekday rhythm — volume dips at weekends, so a
+                              // flat random spread would read as fake.
+                              tickets: [520, 486, 470, 442, 398, 214, 188][i % 7] + ((i * 13) % 40),
+                            }))}
+                            margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+                          >
+                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#999', fontSize: 10 }} interval={6} />
+                            <YAxis axisLine={false} tickLine={false} tick={false} />
+                            <Tooltip
+                              formatter={(value: number) => [`${value} tickets`, '']}
+                              labelFormatter={(label) => `Day ${label}`}
+                              contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }}
+                              cursor={false}
+                            />
+                            <Bar dataKey="tickets" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={8} />
+                          </RechartsBarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
                   {item.content?.chartType === 'active-users' && (
                     <div className="flex-1 flex flex-col px-5 pt-2 pb-4">
                       <div className="flex items-center justify-between mb-3">
@@ -5731,6 +6013,15 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               </div>
             )}
           </div>
+          </div>
+
+          {/* Floating suggestions — editing only, and only until dismissed */}
+          {isEditing && !tipDismissed && (
+            <DashboardSuggestions
+              onDismiss={() => setTipDismissed(true)}
+              onAction={handleSuggestionAction}
+            />
+          )}
         </div>
       </div>
 
@@ -5968,6 +6259,108 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Context graph — opens from the centre toolbar's flow button. The body is
+          intentionally empty for now; only the shell exists. */}
+      <Drawer open={showContextGraph} onOpenChange={setShowContextGraph} direction="right" modal={false}>
+        <DrawerContent
+          // The shared DrawerContent sets `w-3/4 sm:max-w-sm` behind a
+          // direction variant, so the width has to come from an inline style
+          // to win. Matches the Analyst copilot drawer in TopBar.
+          className="fixed right-0 z-50 flex flex-col overflow-hidden rounded-[24px] border-l border-border bg-background"
+          style={{ top: 56, height: 'calc(100vh - 64px)', width: 420, maxWidth: 420 }}
+        >
+          <DrawerHeader className="border-b border-border">
+            <div className="flex items-center justify-between">
+              <DrawerTitle className="text-base font-medium">Context graph</DrawerTitle>
+              <DrawerClose asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Close context graph"
+                  className={FLORA_ICON_BTN}
+                >
+                  <X className={FLORA_ICON} />
+                </Button>
+              </DrawerClose>
+            </div>
+            <DrawerDescription className="sr-only">
+              The relationships between this dashboard and the data it draws on
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="flex-1 overflow-y-auto" />
+        </DrawerContent>
+      </Drawer>
+
+      {/* Copilot Side Panel — opens from the centre toolbar's sparkle button */}
+      {showCopilot && (
+        <div className="w-96 shrink-0 h-full bg-white rounded-[24px] overflow-hidden flex flex-col">
+          <div className="border-b border-border px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex shrink-0 items-center justify-center" aria-hidden>
+                  <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />
+                </span>
+                <div>
+                  <h3 className="text-base font-normal">Copilot</h3>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Close copilot"
+                className={FLORA_ICON_BTN}
+                onClick={() => setShowCopilot(false)}
+              >
+                <X className={FLORA_ICON} />
+              </Button>
+            </div>
+            <p className="text-base text-muted-foreground mt-1">
+              Describe a change and copilot will edit the dashboard for you
+            </p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="space-y-2">
+              <MD tag="span" className="!text-muted-foreground">Try asking</MD>
+              {[
+                'Add a CSAT trend chart for the last quarter',
+                'Group these reports into a section',
+                'Switch the ticket volume chart to a bar chart',
+              ].map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => console.log('Copilot prompt:', suggestion)}
+                  className="flex w-full items-start gap-2 rounded-[8px] border border-[#dcdcda] px-3 py-2 text-left transition-colors hover:bg-muted/50"
+                >
+                  <Sparkles className={`${FLORA_ICON} mt-0.5`} />
+                  <MD tag="span" className="!text-foreground">{suggestion}</MD>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-border px-6 py-4">
+            <FloraTextarea
+              rows={3}
+              placeholder="Ask copilot to edit this dashboard"
+              aria-label="Ask copilot to edit this dashboard"
+              isResizable={false}
+            />
+            <div className="mt-2 flex justify-end">
+              <FloraButton
+                isPrimary
+                isPill
+                size="small"
+                onClick={() => console.log('Send to copilot')}
+              >
+                Send
+              </FloraButton>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Version History Side Panel */}
       {showVersionHistory && (

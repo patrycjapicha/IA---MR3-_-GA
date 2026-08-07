@@ -360,9 +360,10 @@ html {
   flex-shrink: 0;
 }
 
-/* Save and Share swap in the same slot, so pin them to one width (the wider
-   of the two labels) and let the label button absorb the difference. */
-.dashboard-primary-split-button {
+/* Save (a split button) and Share (a plain button) swap in the same slot, so
+   pin both to one width and let the label button absorb the difference. */
+.dashboard-primary-split-button,
+.dashboard-primary-action-button {
   width: 91px !important;
   flex-shrink: 0;
 }

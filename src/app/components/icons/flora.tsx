@@ -213,6 +213,9 @@ const NestedInParentIcon = (props: SVGProps<SVGSVGElement>) => (
 
 export const Activity = ActivityIcon;
 export const ActivityStroke = ActivityStrokeIcon;
+// Same glyph as ActivityStroke, named for its connected-nodes reading rather
+// than its chart reading (used by the context graph affordance).
+export const FlowStroke = ActivityStrokeIcon;
 export const AlertCircle = AlertCircleIcon;
 export const AlertTriangle = AlertTriangleIcon;
 export const Archive = ArchiveIcon;
