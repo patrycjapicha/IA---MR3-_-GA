@@ -10,14 +10,6 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group';
 import { Toggle } from './ui/toggle';
 import { Input } from './ui/input';
 import { Switch } from './ui/switch';
-import { 
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerClose
-} from './ui/drawer';
 import {
   BarChart3Stroke as BarChartIcon,
   TextStroke,
@@ -111,6 +103,24 @@ import {
 } from 'recharts';
 import { ServiceOpsChart, isServiceOpsChart, isServiceOpsChromeless } from './dashboard/service-ops';
 import { MonitoringChart, isMonitoringChart, isMonitoringChromeless } from './dashboard/monitoring-ops';
+import {
+  AI_SUMMARY_BAND_HEIGHT,
+  AI_SUMMARY_HEIGHT,
+  AI_SUMMARY_WIDTH,
+  AiSuggestionList,
+  AiSummaryCard,
+  REPORT_SUMMARY_EXTRA_HEIGHT,
+  ReportSummaryBand,
+  createAiSummaryContent,
+  createMonitoringAiSummary,
+  createReportSummary,
+  createServiceReviewAiSummary,
+  hasReportSummary,
+  isAiSummaryChart,
+} from './dashboard/ai-summary';
+import { AiSummarySettingsDrawer, createAiSummarySettings } from './dashboard/ai-summary-settings';
+import { LayoutSettingsDrawer, createLayoutSettings, type LayoutSettings } from './dashboard/layout-settings';
+import { BuilderDrawer } from './dashboard/builder-drawer';
 
 const FLORA_ICON = 'size-[16px] shrink-0 text-muted-foreground';
 const FLORA_TOOLBAR_ICON = 'size-[16px] shrink-0 text-muted-foreground';
@@ -134,16 +144,15 @@ const FILTER_MENU_SEARCH_CLASS = 'box-border w-full min-w-0 overflow-hidden bord
 const FILTER_MENU_LIST_CLASS =
   'max-h-60 overflow-x-hidden overflow-y-auto py-1 [scrollbar-gutter:stable]';
 
-const REFRESH_RATE_DEFAULT = 'default';
-const REFRESH_RATE_OPTIONS: { value: string; label: string; short: string; hint?: string; isDefault?: boolean }[] = [
-  { value: 'default', label: 'Default', short: '60 sec', hint: '60 sec', isDefault: true },
-  { value: 'manual', label: 'Paused', short: 'Paused', hint: 'Auto-refresh is paused. Refresh only when you click the refresh icon.' },
-  { value: '10s', label: 'Every 10 seconds', short: '10 sec' },
-  { value: '30s', label: 'Every 30 seconds', short: '30 sec' },
-  { value: '60s', label: 'Every 60 seconds', short: '60 sec' },
-  { value: '5m', label: 'Every 5 minutes', short: '5 min' },
-  { value: '10m', label: 'Every 10 minutes', short: '10 min' },
-  { value: '30m', label: 'Every 30 minutes', short: '30 min' },
+const REFRESH_RATE_DEFAULT = '60s';
+const REFRESH_RATE_OPTIONS: { value: string; label: string; short: string }[] = [
+  { value: 'manual', label: 'Paused', short: 'Paused' },
+  { value: '10s', label: '10 seconds', short: '10 sec' },
+  { value: '30s', label: '30 seconds', short: '30 sec' },
+  { value: '60s', label: '60 seconds', short: '60 sec' },
+  { value: '5m', label: '5 minutes', short: '5 min' },
+  { value: '10m', label: '10 minutes', short: '10 min' },
+  { value: '30m', label: '30 minutes', short: '30 min' },
 ];
 
 // Cross-filtering settings for a report widget. Four independent dropdowns,
@@ -254,6 +263,11 @@ function WidgetStyleControls({
   onShare,
   onOpenReport,
   enableCrossFilter = false,
+  onOpenSettings,
+  settingsLabel,
+  settingsActive = false,
+  onToggleAiSummary,
+  aiSummaryOn = false,
 }: {
   style: any;
   onChange: (patch: Record<string, any>) => void;
@@ -262,14 +276,26 @@ function WidgetStyleControls({
   onShare?: () => void;
   onOpenReport?: () => void;
   enableCrossFilter?: boolean;
+  // Opens the widget's own configuration surface. The toolbar only offers the
+  // button; where the settings live is the widget's business, not this row's.
+  onOpenSettings?: () => void;
+  settingsLabel?: string;
+  settingsActive?: boolean;
+  // Adds or removes this report's own AI summary. Offered per report because a
+  // dashboard-level summary and a summary of one chart answer different
+  // questions, and an author may want either or both.
+  onToggleAiSummary?: () => void;
+  aiSummaryOn?: boolean;
 }) {
   const sShadow = style?.shadow === true;
   const sBorder = defaultBorderOn ? style?.border !== false : style?.border === true;
   const sBorderColor = style?.borderColor || '#e5e7eb';
   const sBorderWidth = style?.borderWidth ?? 1;
   const sBg = style?.bgColor || 'transparent';
+  // gap-1.5 matches the toolbar's own py-1.5, so the icon row is inset by the
+  // same amount above (toolbar padding) and below (this gap, up to the divider).
   return (
-    <div className={`flex flex-col gap-2 ${enableCrossFilter ? 'w-[420px]' : ''}`}>
+    <div className={`flex flex-col gap-1.5 ${enableCrossFilter ? 'w-[420px]' : ''}`}>
       <div className="flex items-center gap-1">
       {/* Component background */}
       <DropdownMenu>
@@ -282,10 +308,13 @@ function WidgetStyleControls({
             <span className="flex h-4 w-4 items-center justify-center rounded-full border border-[#dcdcda]" style={{ backgroundColor: sBg === 'transparent' ? '#ffffff' : sBg }} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56 p-3" onClick={(e) => e.stopPropagation()}>
+        {/* z-[400] beats the toolbar's own z-[300]: this menu portals to <body>,
+            so at the default z-50 the cross-filtering panel below the trigger
+            would paint over the swatches. */}
+        <DropdownMenuContent align="start" className="z-[400] w-56 p-3" onClick={(e) => e.stopPropagation()}>
           <span className="mb-2 block text-xs text-muted-foreground">Background</span>
           <div onClick={(e) => e.stopPropagation()}>
-            <FloraColorPicker value={sBg} onChange={(c) => onChange({ bgColor: c })} allowTransparent />
+            <FloraColorPicker value={sBg} onChange={(c) => onChange({ bgColor: c })} allowTransparent palette={TEXT_STYLE_PALETTE} />
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -311,7 +340,8 @@ function WidgetStyleControls({
             <StopStroke className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-56 p-3 space-y-3" onClick={(e) => e.stopPropagation()}>
+        {/* z-[400] for the same reason as the background menu above. */}
+        <DropdownMenuContent align="start" className="z-[400] w-56 p-3 space-y-3" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">Border</span>
             <button
@@ -351,6 +381,44 @@ function WidgetStyleControls({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* AI summary — a report's own summary, on or off. Same glyph as the centre
+          toolbar's AI summary tool, because it inserts the same kind of thing:
+          one scoped to this report rather than to the whole dashboard. */}
+      {onToggleAiSummary && (
+        <FloraTooltip
+          content={aiSummaryOn ? 'Remove AI summary' : 'Add AI summary'}
+          placement="bottom"
+          size="small"
+        >
+          <button
+            className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${
+              aiSummaryOn ? 'bg-muted' : 'hover:bg-muted'
+            }`}
+            aria-label={aiSummaryOn ? 'Remove AI summary' : 'Add AI summary'}
+            aria-pressed={aiSummaryOn}
+            onClick={(e) => { e.stopPropagation(); onToggleAiSummary(); }}
+          >
+            <PencilSparkleStroke className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+          </button>
+        </FloraTooltip>
+      )}
+
+      {/* Widget settings — sits beside the style controls because both are the
+          author's contextual controls for the selected widget, and splitting them
+          across two surfaces would make the author hunt for one of them. The
+          settings themselves open in a side drawer, so this button only toggles. */}
+      {onOpenSettings && (
+        <button
+          className={`flex h-8 items-center gap-1.5 rounded-[8px] px-2 text-sm transition-colors ${settingsActive ? 'bg-muted' : 'hover:bg-muted'}`}
+          aria-label={settingsLabel || 'Widget settings'}
+          aria-expanded={settingsActive}
+          onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+        >
+          <SlidersHorizontal className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />
+          Settings
+        </button>
+      )}
+
       {/* Open report + Share + Delete — pushed to the right edge of the row */}
       {(onOpenReport || onShare || onDelete) && (
         <div className="ml-auto mr-0.5 h-5 w-px bg-[#dcdcda]" />
@@ -386,7 +454,7 @@ function WidgetStyleControls({
 
       {/* Cross-filtering settings — labeled dropdowns below the icon row */}
       {enableCrossFilter && (
-        <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-[#dcdcda] pb-1 pt-4" onClick={(e) => e.stopPropagation()}>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-[#dcdcda] pb-1 pt-4" onClick={(e) => e.stopPropagation()}>
           {CROSS_FILTER_SETTINGS.map((setting) => {
             const current = style?.[setting.key] || setting.default;
             return (
@@ -405,6 +473,65 @@ function WidgetStyleControls({
         </div>
       )}
     </div>
+  );
+}
+
+// The AI summary's own overflow menu, in its top-right corner beside the tag.
+//
+// The widget has this in addition to the selection toolbar because its actions are
+// about the summary as a piece of writing — copy the text, share the briefing —
+// rather than about a box on a canvas, and they should be reachable without first
+// selecting the widget. Delete is repeated from the toolbar since a menu that can
+// do everything but remove the thing reads as incomplete.
+function AiSummaryOverflowMenu({
+  onCopyText,
+  onShare,
+  onDelete,
+  onCreateWithCopilot,
+}: {
+  onCopyText: () => void;
+  onShare: () => void;
+  onDelete: () => void;
+  onCreateWithCopilot: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="AI summary options"
+          // stopPropagation on the whole trigger: the canvas below treats a click
+          // as select-or-deselect, and opening this menu is neither.
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] text-[#68737d] transition-colors hover:bg-black/5 hover:text-foreground"
+        >
+          <MoreVertical className="shrink-0" style={{ width: 14, height: 14 }} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="z-[400] w-48" onClick={(e) => e.stopPropagation()}>
+        {/* Same item as a report's menu offers, pointed at this summary: the
+            widget's settings cover what it is written from, and this covers the
+            changes there is no control for. */}
+        <DropdownMenuItem className="gap-2" onClick={onCreateWithCopilot}>
+          <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />
+          <MD tag="span" className="!text-foreground">Create with copilot</MD>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="gap-2" onClick={onCopyText}>
+          <Copy className={FLORA_MENU_ICON} />
+          <MD tag="span" className="!text-foreground">Copy text</MD>
+        </DropdownMenuItem>
+        <DropdownMenuItem className="gap-2" onClick={onShare}>
+          <ShareStroke className={FLORA_MENU_ICON} />
+          <MD tag="span" className="!text-foreground">Share</MD>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" className="gap-2" onClick={onDelete}>
+          <Trash2 className="size-[16px] shrink-0" style={{ color: '#c72a1c' }} />
+          <MD tag="span" className="!text-destructive">Delete</MD>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -653,8 +780,7 @@ const toolbarItems = [
     label: 'AI summary',
     shortcut: 'A',
     icon: <PencilSparkleStroke className={FLORA_TOOLBAR_ICON} />,
-    description: 'Coming soon',
-    disabled: true
+    description: 'Add an AI-written summary'
   }
 ];
 
@@ -776,15 +902,36 @@ const DASHBOARD_SUGGESTIONS: SuggestionAction[] = [
   },
 ];
 
-// Chip geometry and colours come from the 🌸 Suggestions component in Figma
-// (Dashboard builder — components, node 37:337): 40px tall, 16/10 padding,
-// 8px gap, pill radius, neutral-700 at 8% ground, accent sparkle.
+// Colours come from the 🌸 Suggestions component in Figma (Dashboard builder —
+// components, node 37:337): pill radius, neutral-700 ground, accent sparkle.
+// That ground is specified as 8% alpha, but the chips float over the editing
+// grid, whose dots would show straight through a translucent pill. These are the
+// same greys flattened against the canvas (#fafafa), so the chip looks unchanged
+// while staying opaque.
+// Geometry is the compact variant rather than that node's 40px default, built
+// from Flora's own small-button tokens — 32px tall (space.base * 8), 12px side
+// padding (space.base * 3), 12px text (fontSizes.sm) — so the row reads as a
+// hint over the canvas instead of a primary action bar.
 const SUGGESTION_CHIP =
-  'flex h-[40px] shrink-0 cursor-pointer items-center justify-center gap-[8px] rounded-[99px] bg-[#64686414] px-[16px] py-[10px] transition-colors hover:bg-[#64686424]';
+  'flex h-[32px] shrink-0 cursor-pointer items-center justify-center gap-[6px] rounded-[99px] bg-[#eeefee] px-[12px] transition-colors hover:bg-[#e5e5e5]';
 
 // The row of suggestion chips that floats in the canvas's bottom-left corner.
 // Applying a chip drops it from the row, so a second click can't add a
 // duplicate report and the row shrinks as the user works through it.
+//
+// The chips rise into the corner when edit mode opens rather than appearing with
+// it. Entering edit mode already changes the toolbar, the grid and the widget
+// chrome all at once; suggestions arriving a beat later read as an offer the
+// builder is making rather than as more of the chrome that just switched on, and
+// the motion is what draws the eye to a corner nobody was looking at.
+//
+// Staggered by index: the row lands as a row rather than as one wide block, which
+// is also what says the chips are four separate things to pick from. 40ms is short
+// enough that the whole row is in under a quarter second.
+const SUGGESTION_STAGGER_MS = 40;
+// A beat after the mode switch itself, so the two don't read as one event.
+const SUGGESTION_DELAY_MS = 140;
+
 function DashboardSuggestions({
   onDismiss,
   onAction,
@@ -795,6 +942,30 @@ function DashboardSuggestions({
   const [used, setUsed] = useState<string[]>([]);
   const remaining = DASHBOARD_SUGGESTIONS.filter((s) => !used.includes(s.id));
 
+  // Only the chips present on the first render animate in. A chip is removed from
+  // the row when it is used, and re-running the entrance on the survivors would
+  // make the whole row jump every time an author clicked one.
+  const [hasEntered, setHasEntered] = useState(false);
+  useEffect(() => {
+    // Two frames: one for the mounted-but-unentered paint, one for the browser to
+    // pick up the animation. A timeout of 0 lands mid-frame on a busy mode switch.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => setHasEntered(true)));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Chips animate on the first pass and are left alone after it, so the classes
+  // are applied per chip rather than to the row: a transform on the wrapper would
+  // also move the dismiss button, and it belongs to the row, not to the offer.
+  // fill-mode-both holds the from-state through the delay, so a chip waiting its
+  // turn stays down rather than flashing in place first.
+  const entrance = hasEntered
+    ? 'animate-in fade-in slide-in-from-bottom-3 duration-300 ease-out fill-mode-both'
+    : 'opacity-0';
+  const entranceStyle = (index: number) =>
+    hasEntered
+      ? { animationDelay: `${SUGGESTION_DELAY_MS + index * SUGGESTION_STAGGER_MS}ms` }
+      : undefined;
+
   if (remaining.length === 0) return null;
 
   return (
@@ -804,7 +975,7 @@ function DashboardSuggestions({
     // container isn't a stacking context, so those compete with this directly
     // and would otherwise swallow clicks on a chip.
     <div className="pointer-events-auto absolute bottom-4 left-4 z-[120] flex max-w-[calc(100%-32px)] flex-wrap items-center gap-[8px]">
-      {remaining.map((suggestion) => (
+      {remaining.map((suggestion, index) => (
         <button
           key={suggestion.id}
           type="button"
@@ -812,24 +983,32 @@ function DashboardSuggestions({
             onAction(suggestion);
             setUsed((prev) => [...prev, suggestion.id]);
           }}
-          className={SUGGESTION_CHIP}
+          className={`${SUGGESTION_CHIP} ${entrance}`}
+          style={entranceStyle(index)}
         >
-          <Sparkles className="size-[20px] shrink-0 !text-[#8d59b1]" aria-hidden />
-          <span className="whitespace-nowrap text-[14px] leading-[20px] tracking-[-0.154px] text-[#2f3130]">
+          {/* 16px icon against 13px text. 13px rather than Flora's 12px small
+              size so this row, the AI summary's follow-ups and copilot's drawer
+              are one pill at one size — they are the same offer in three places,
+              and a pixel of difference between them is the kind of thing that
+              reads as a mistake rather than as a variant. */}
+          <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" aria-hidden />
+          <span className="whitespace-nowrap text-[13px] leading-[18px] tracking-[-0.132px] text-[#2f3130]">
             {suggestion.label}
           </span>
         </button>
       ))}
       {/* Not part of the Figma component, but the chips sit over the canvas
           indefinitely otherwise. Borrows the chip's own shape so it reads as
-          part of the row. */}
+          part of the row, and comes in last so the way out arrives after the
+          offer it dismisses. */}
       <button
         type="button"
         aria-label="Dismiss suggestions"
         onClick={onDismiss}
-        className={`${SUGGESTION_CHIP} w-[40px] !px-0`}
+        className={`${SUGGESTION_CHIP} w-[32px] !px-0 ${entrance}`}
+        style={entranceStyle(remaining.length)}
       >
-        <X className="size-[16px] shrink-0 text-[#2f3130]" />
+        <X className="size-[14px] shrink-0 text-[#2f3130]" />
       </button>
     </div>
   );
@@ -1112,20 +1291,24 @@ const libChart = (
   content: { ...content, style: { shadow: false, border, borderColor, borderWidth: 1, bgColor: bg } },
 });
 
-// Each section gets a light tint plus a saturated accent used for its heading
-// strip. The tints stay near-white so the white cards on top still separate from
-// them, and every accent is only ever a reinforcement — headings, labels, icons
-// and trend arrows carry the meaning on their own.
+// Only the executive summary carries a tint. Colouring every band turned the
+// page into five competing areas and made the tint meaningless as a signal; with
+// one blue band the summary reads as the thing to look at first and everything
+// below it is plain reporting surface. The accents stay defined per section so a
+// band can still borrow its own hue for a heading or label if it needs one.
+const SO_PANEL_WHITE = { bg: '#ffffff', border: '#e9ebed' };
 const SO_SECTIONS = {
   summary: { bg: '#f4f7fb', border: '#dbe6f3', accent: '#1f4f8f' },
-  demand: { bg: '#f7f5fc', border: '#e4dcf3', accent: '#5b4bc4' },
-  service: { bg: '#fdf8f1', border: '#f2e5cf', accent: '#a8641b' },
-  experience: { bg: '#f3faf7', border: '#d6ebe3', accent: '#12775b' },
-  teams: { bg: '#f5f6fa', border: '#e0e3ee', accent: '#3f4a7e' },
+  demand: { ...SO_PANEL_WHITE, accent: '#5b4bc4' },
+  service: { ...SO_PANEL_WHITE, accent: '#a8641b' },
+  experience: { ...SO_PANEL_WHITE, accent: '#12775b' },
+  teams: { ...SO_PANEL_WHITE, accent: '#3f4a7e' },
 };
 
-// Vertical rhythm — generous, so the bands read as separate areas.
-const SO_SECTION_GAP = 40;
+// Vertical rhythm between bands. Tight, because the panels now carry their own
+// edges: with white sections a wide gap read as five loose sheets rather than one
+// document, and each panel's own bottom padding already gives its content room.
+const SO_SECTION_GAP = 16;
 const SO_PAD = 24; // inset from a section panel's edge to the cards on it
 // Space below the last card in a section, before the panel's bottom edge. Larger
 // than the top inset so each band has visible room to breathe under its content.
@@ -1143,6 +1326,13 @@ const SO_CARD_CHROME = { bg: 'transparent', border: false } as const;
 const SO_HERO_BG = '#284173';
 const SO_HERO_TEXT = '#ffffff';
 const SO_HERO_TEXT_MUTED = '#dfe7f4';
+// The hero headline runs light rather than medium — see so-hero-title.
+const SO_HERO_TITLE_WEIGHT = 300;
+// The hero breathes far more than the sections below it: 50px on top of the
+// standard inset, above the first line and below the last, so the opening band
+// reads as a title page rather than as another panel.
+const SO_HERO_EXTRA_PAD = 50;
+const SO_HERO_PAD_Y = SO_PAD + SO_HERO_EXTRA_PAD;
 
 // Cards live inside a section panel, inset from its edges, so they run on their
 // own 12-column grid measured from the panel's inner width rather than the page.
@@ -1193,7 +1383,7 @@ function createLibraryDashboardItems(): ContentItem[] {
   // Full-width dark band: headline, reporting period, and a short intro, all in
   // white. The global filter bar lives in the toolbar above the canvas, so it
   // isn't duplicated here — one filter row scopes everything below it.
-  const heroH = 182;
+  const heroH = 182 + SO_HERO_EXTRA_PAD * 2;
   items.push(
     libPanel('so-hero-panel', {
       x: libX(0),
@@ -1207,7 +1397,7 @@ function createLibraryDashboardItems(): ContentItem[] {
   items.push(
     libHeading('so-hero-eyebrow', 'Executive service review · Q3 2026', {
       x: libX(0) + SO_PAD + 8,
-      y: y + SO_PAD + 4,
+      y: y + SO_HERO_PAD_Y + 4,
       w: libSpan(6),
       fontSize: 14,
       fontWeight: 500,
@@ -1217,10 +1407,13 @@ function createLibraryDashboardItems(): ContentItem[] {
   items.push(
     libHeading('so-hero-title', 'Support is getting faster while demand shifts to chat', {
       x: libX(0) + SO_PAD + 8,
-      y: y + SO_PAD + 28,
+      y: y + SO_HERO_PAD_Y + 28,
       w: libSpan(8),
       fontSize: 32,
-      fontWeight: 500,
+      // Light, not medium: at 32px on a dark band the size alone establishes the
+      // hierarchy, and the thinner stroke keeps a full sentence readable instead
+      // of shouting it.
+      fontWeight: SO_HERO_TITLE_WEIGHT,
       color: SO_HERO_TEXT,
     })
   );
@@ -1230,7 +1423,7 @@ function createLibraryDashboardItems(): ContentItem[] {
       'Weeks 27–32 (6 Jul – 16 Aug 2026) across all channels, brands and regions. Resolution time and satisfaction both improved; urgent-priority SLA and the Escalations queue are the two areas that need a decision this quarter.',
       {
         x: libX(0) + SO_PAD + 8,
-        y: y + SO_PAD + 80,
+        y: y + SO_HERO_PAD_Y + 80,
         w: libSpan(8),
         h: 68, // two wrapped lines — without an explicit height the copy is clipped
         fontSize: 15,
@@ -1242,7 +1435,7 @@ function createLibraryDashboardItems(): ContentItem[] {
   items.push(
     libHeading('so-hero-meta', 'Reporting period\nWk 27 – Wk 32 2026\n\nCompared with\nWk 21 – Wk 26 2026', {
       x: libX(9),
-      y: y + SO_PAD + 20,
+      y: y + SO_HERO_PAD_Y + 20,
       w: libSpan(3) - SO_PAD - 8,
       h: 118, // five lines of period metadata
       fontSize: 14,
@@ -1252,9 +1445,20 @@ function createLibraryDashboardItems(): ContentItem[] {
   );
   y += heroH + SO_SECTION_GAP;
 
-  // ---- Executive summary: KPI band + AI narrative -------------------------
-  // Three KPIs rather than a wall of them, so the band stays readable, plus the
-  // period's written summary as the one tinted card in the row.
+  // ---- Executive summary: KPI band + AI summary ----------------------------
+  // Three KPIs rather than a wall of them, so the band stays readable, then the
+  // AI summary across the full width beneath them.
+  //
+  // The summary is the real widget, not a card written to look like one: it is
+  // the same component the builder's AI summary tool inserts, reading the same
+  // content shape, so the mock shows what the feature actually does — sourced
+  // claims that open their report, ranked findings, and hand-offs into copilot.
+  // A prebuilt dashboard that faked it would be demonstrating a screenshot.
+  //
+  // It sits under the KPIs rather than beside them for the reason the widget's
+  // own default width says: three findings need three columns, and a quarter of
+  // the band gives it one narrow column with the evidence wrapping every second
+  // word.
   const kpiH = 226;
   const summary = soSection('summary', {
     y,
@@ -1262,7 +1466,7 @@ function createLibraryDashboardItems(): ContentItem[] {
     blurb: 'The three measures leadership commits to externally, and what changed behind them.',
     bg: SO_SECTIONS.summary.bg,
     border: SO_SECTIONS.summary.border,
-    bodyH: kpiH,
+    bodyH: kpiH + LIB_GAP + AI_SUMMARY_BAND_HEIGHT,
   });
   items.push(...summary.items);
   const summaryY = summary.bodyY;
@@ -1319,29 +1523,28 @@ function createLibraryDashboardItems(): ContentItem[] {
       },
     ],
   ];
+  // Four columns each now that the summary has moved below them: three KPIs
+  // across nine columns left a quarter of the band empty.
   kpis.forEach(([id, title, content], i) => {
     items.push(
-      libChart(id, title, { x: soInX(i * 3), y: summaryY, w: soIn(3), h: kpiH }, content)
+      libChart(id, title, { x: soInX(i * 4), y: summaryY, w: soIn(4), h: kpiH }, content)
     );
   });
   items.push(
+    // No surface and no border of its own: the summary sits on the section band
+    // like every other widget in this layout (SO_CARD_CHROME). Its finding cards
+    // already carry their own edges, so the widget reads as a group of cards on the
+    // band rather than needing a box drawn around the group.
     libChart(
-      'so-summary-narrative',
-      'Period summary',
-      { x: soInX(9), y: summaryY, w: soIn(3), h: kpiH },
+      'so-summary-ai',
+      'AI summary',
       {
-        chartType: 'so-narrative',
-        reportSource: 'Customer Support Analytics',
-        reportType: 'Analytics',
-        heading: 'What changed this period',
-        summary:
-          'Faster routing cut resolution time by a third without hurting quality — but the gains are unevenly spread.',
-        points: [
-          'Chat overtook email as the busiest channel in week 31.',
-          'Urgent-priority SLA slipped to 82%, below the 90% commitment.',
-          'Escalations is running at 96% occupancy with a growing backlog.',
-        ],
+        x: soInX(0),
+        y: summaryY + kpiH + LIB_GAP,
+        w: soIn(12),
+        h: AI_SUMMARY_BAND_HEIGHT,
       },
+      createServiceReviewAiSummary(),
       SO_CARD_CHROME
     )
   );
@@ -1388,17 +1591,19 @@ function createLibraryDashboardItems(): ContentItem[] {
   y += demand.height + SO_SECTION_GAP;
 
   // ---- Service efficiency & SLA ------------------------------------------
-  // Two comparison charts side by side, then the risk callout underneath, all on
-  // the one section panel.
+  // Two comparison charts side by side. The Risk / Opportunity callout row that
+  // used to close this band is gone: it said what the AI summary's first and third
+  // findings now say, in the same words and with the same numbers, so the
+  // dashboard was making its two most important points twice — and the summary is
+  // the version that carries its sources and its next steps.
   const serviceChartH = 330;
-  const serviceCalloutH = 166;
   const service = soSection('service', {
     y,
     title: 'Service efficiency and SLA',
     blurb: 'How quickly we respond and resolve, and whether we are keeping the commitments we sold.',
     bg: SO_SECTIONS.service.bg,
     border: SO_SECTIONS.service.border,
-    bodyH: serviceChartH + LIB_GAP + serviceCalloutH,
+    bodyH: serviceChartH,
   });
   items.push(...service.items);
   items.push(
@@ -1425,46 +1630,6 @@ function createLibraryDashboardItems(): ContentItem[] {
         reportType: 'Compliance',
         description: 'Share of tickets resolved inside their SLA target, split by priority, against the 90% commitment.',
       }
-    )
-  );
-  const serviceCalloutY = service.bodyY + serviceChartH + LIB_GAP;
-
-  items.push(
-    libChart(
-      'so-service-callout',
-      'Threshold breach',
-      { x: soInX(0), y: serviceCalloutY, w: soIn(6), h: serviceCalloutH },
-      {
-        chartType: 'so-callout',
-        tone: 'risk',
-        reportSource: 'SLA Compliance Report',
-        reportType: 'Compliance',
-        heading: 'Urgent-priority SLA has breached its 90% commitment',
-        body:
-          'Urgent tickets finished inside SLA 82% of the time this period, down 6 points. Two enterprise contracts carry service credits at 90%.',
-        metric: '82%',
-        metricLabel: 'attainment vs 90% target',
-      },
-      SO_CARD_CHROME
-    )
-  );
-  items.push(
-    libChart(
-      'so-service-win',
-      'Material improvement',
-      { x: soInX(6), y: serviceCalloutY, w: soIn(6), h: serviceCalloutH },
-      {
-        chartType: 'so-callout',
-        tone: 'win',
-        reportSource: 'Resolution Time Analysis',
-        reportType: 'KPI',
-        heading: 'Routing changes cut resolution time by a third',
-        body:
-          'The skills-based routing rollout in week 28 is the single largest driver, and it held through a 12% rise in volume.',
-        metric: '−3.3 h',
-        metricLabel: 'median resolution vs week 27',
-      },
-      SO_CARD_CHROME
     )
   );
   y += service.height + SO_SECTION_GAP;
@@ -1583,13 +1748,15 @@ function createLibraryDashboardItems(): ContentItem[] {
 // one global filter bar in the toolbar. The page's own row of filter chips is
 // gone: duplicating filters inside the canvas gave two sources of truth for the
 // same scope.
+// Same rule as the service review: the executive summary is the one tinted band,
+// every other section sits on white. See SO_SECTIONS.
 const MON_SECTIONS = {
   exec: { bg: '#f4f8fc', border: '#c8dcec', accent: '#144a75' },
-  demand: { bg: '#f7f5fd', border: '#dcd6f5', accent: '#5f4fd1' },
-  sla: { bg: '#fdf8f1', border: '#f0dcc4', accent: '#ad5918' },
-  cx: { bg: '#f2faf8', border: '#c9e8e2', accent: '#0b7d6e' },
-  team: { bg: '#f5f6fb', border: '#d5daee', accent: '#3d4fa1' },
-  risk: { bg: '#fdf6f6', border: '#f0d4d5', accent: '#a3232b' },
+  demand: { ...SO_PANEL_WHITE, accent: '#5f4fd1' },
+  sla: { ...SO_PANEL_WHITE, accent: '#ad5918' },
+  cx: { ...SO_PANEL_WHITE, accent: '#0b7d6e' },
+  team: { ...SO_PANEL_WHITE, accent: '#3d4fa1' },
+  risk: { ...SO_PANEL_WHITE, accent: '#a3232b' },
 };
 
 function createMonitoringDashboardItems(): ContentItem[] {
@@ -1599,7 +1766,7 @@ function createMonitoringDashboardItems(): ContentItem[] {
   // ---- Hero ---------------------------------------------------------------
   // The lede: what the period says in one sentence, so the rest of the
   // dashboard is read as evidence for it rather than as a pile of charts.
-  const heroH = 184;
+  const heroH = 184 + SO_HERO_EXTRA_PAD * 2;
   items.push(
     libPanel('mon-hero-panel', {
       x: libX(0),
@@ -1613,7 +1780,7 @@ function createMonitoringDashboardItems(): ContentItem[] {
   items.push(
     libHeading('mon-hero-eyebrow', 'Live · updated 2 minutes ago', {
       x: libX(0) + SO_PAD + 8,
-      y: y + SO_PAD + 4,
+      y: y + SO_HERO_PAD_Y + 4,
       w: libSpan(6),
       fontSize: 14,
       fontWeight: 500,
@@ -1623,10 +1790,10 @@ function createMonitoringDashboardItems(): ContentItem[] {
   items.push(
     libHeading('mon-hero-title', 'Support operations, at a glance', {
       x: libX(0) + SO_PAD + 8,
-      y: y + SO_PAD + 28,
+      y: y + SO_HERO_PAD_Y + 28,
       w: libSpan(8),
       fontSize: 32,
-      fontWeight: 500,
+      fontWeight: SO_HERO_TITLE_WEIGHT,
       color: SO_HERO_TEXT,
     })
   );
@@ -1636,7 +1803,7 @@ function createMonitoringDashboardItems(): ContentItem[] {
       'Demand is running 18% above forecast, driven almost entirely by billing contacts. Response SLA is holding, but resolution SLA has slipped for five consecutive weeks and needs a capacity decision this week. CSAT and AI containment both continue to improve.',
       {
         x: libX(0) + SO_PAD + 8,
-        y: y + SO_PAD + 80,
+        y: y + SO_HERO_PAD_Y + 80,
         w: libSpan(8),
         h: 70, // two wrapped lines — text boxes clip without an explicit height
         fontSize: 15,
@@ -1648,7 +1815,7 @@ function createMonitoringDashboardItems(): ContentItem[] {
   items.push(
     libHeading('mon-hero-meta', 'Reporting period\n1 – 31 July 2026\n\nCompared with\n1 – 30 June 2026', {
       x: libX(9),
-      y: y + SO_PAD + 20,
+      y: y + SO_HERO_PAD_Y + 20,
       w: libSpan(3) - SO_PAD - 8,
       h: 118,
       fontSize: 14,
@@ -1659,8 +1826,14 @@ function createMonitoringDashboardItems(): ContentItem[] {
   y += heroH + SO_SECTION_GAP;
 
   // ---- Executive summary --------------------------------------------------
-  // Four headline numbers, then the demand-vs-plan chart that explains them and
-  // the written read of the period beside it.
+  // Four headline numbers, then the demand-vs-plan chart that explains them, then
+  // the AI summary reading the whole band.
+  //
+  // The summary here is the real widget — the same component the builder's AI
+  // summary tool inserts. It replaces the card that used to sit beside the volume
+  // chart wearing the same title: a mock of a summary can't show the sourced
+  // claims or the copilot hand-offs, which are most of what the widget is.
+  // Full width, because that is where three findings get three columns.
   const kpiH = 200;
   const execRowH = 318;
   const exec = soSection('mon-exec', {
@@ -1669,7 +1842,7 @@ function createMonitoringDashboardItems(): ContentItem[] {
     blurb: 'The four numbers leaders are asking about. Resolution SLA is the one exception this month — everything else is on or ahead of target.',
     bg: MON_SECTIONS.exec.bg,
     border: MON_SECTIONS.exec.border,
-    bodyH: kpiH + LIB_GAP + execRowH,
+    bodyH: kpiH + LIB_GAP + execRowH + LIB_GAP + AI_SUMMARY_BAND_HEIGHT,
   });
   items.push(...exec.items);
 
@@ -1745,7 +1918,7 @@ function createMonitoringDashboardItems(): ContentItem[] {
     libChart(
       'mon-exec-volume',
       'Ticket volume vs. forecast',
-      { x: soInX(0), y: execRowY, w: soIn(8), h: execRowH },
+      { x: soInX(0), y: execRowY, w: soIn(12), h: execRowH },
       {
         chartType: 'mon-volume-forecast',
         reportSource: 'Real-time Monitoring',
@@ -1755,23 +1928,18 @@ function createMonitoringDashboardItems(): ContentItem[] {
     )
   );
   items.push(
+    // No surface of its own, same as the service review's: the finding cards carry
+    // the edges, so a box around them would be a second one.
     libChart(
-      'mon-exec-narrative',
+      'mon-exec-ai',
       'AI summary',
-      { x: soInX(8), y: execRowY, w: soIn(4), h: execRowH },
       {
-        chartType: 'mon-narrative',
-        reportSource: 'Customer Support Analytics',
-        reportType: 'Analytics',
-        heading: 'Billing is the whole story',
-        summary:
-          'Billing and refund contacts are up 18% and account for 78% of the total volume increase. Every other driver is flat or down.',
-        points: [
-          'Resolution SLA fell in the Billing team only — the other three are inside target.',
-          'That makes this a capacity problem rather than a process one.',
-          'Reallocating agents is the fastest lever available this week.',
-        ],
+        x: soInX(0),
+        y: execRowY + execRowH + LIB_GAP,
+        w: soIn(12),
+        h: AI_SUMMARY_BAND_HEIGHT,
       },
+      createMonitoringAiSummary(),
       SO_CARD_CHROME
     )
   );
@@ -2221,6 +2389,8 @@ function AddFilterMenu({
     f.label.toLowerCase().includes(search.toLowerCase()),
   );
 
+  // Same 32px filter icon as viewing mode, so switching modes doesn't shift the
+  // filter bar — only the trigger's behaviour changes.
   const filterIcon = (
     <Filter className={`${FLORA_HEADER_ICON} !text-[#646864]`} aria-hidden />
   );
@@ -2231,7 +2401,7 @@ function AddFilterMenu({
         variant="ghost"
         size="sm"
         disabled
-        className={`h-8 w-8 shrink-0 p-0 ${FLORA_BTN}`}
+        className={`w-[32px] shrink-0 !p-0 ${FLORA_BTN} !h-[32px]`}
         aria-label="Add filter"
       >
         {filterIcon}
@@ -2258,7 +2428,7 @@ function AddFilterMenu({
           <Button
             variant="ghost"
             size="sm"
-            className={`w-[32px] shrink-0 p-0 hover:bg-muted ${FLORA_BTN} !h-[32px]`}
+            className={`w-[32px] shrink-0 !p-0 hover:bg-muted ${FLORA_BTN} !h-[32px]`}
             aria-label="Add filter"
           >
             {filterIcon}
@@ -2413,8 +2583,11 @@ function FloraSelectField({
   ariaLabel?: string;
   dense?: boolean;
 }) {
+  // dense drops the combobox to 12px, but the line box must stay 20px to match
+  // the height Garden gives the trigger value and each option's content box —
+  // a 14px leading would sit the text at the top of both instead of centered.
   return (
-    <ComboboxField className={dense ? '[&_[data-garden-id="dropdowns.combobox"]_*]:!text-[12px] [&_[data-garden-id="dropdowns.combobox"]_*]:!leading-4' : undefined}>
+    <ComboboxField className={dense ? '[&_[data-garden-id="dropdowns.combobox"]_*]:!text-[12px] [&_[data-garden-id="dropdowns.combobox"]_*]:!leading-[20px]' : undefined}>
       {label ? (
         <ComboboxField.Label className={dense ? '!text-[12px] !leading-4 !font-normal text-foreground' : 'text-sm font-medium text-foreground'}>{label}</ComboboxField.Label>
       ) : (
@@ -3304,9 +3477,9 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(startsInEditMode);
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(true);
-  const [refreshRate, setRefreshRate] = useState('default');
+  const [refreshRate, setRefreshRate] = useState(REFRESH_RATE_DEFAULT);
   // Remembers the rate active before switching to "Paused" so removing the pause tag can restore it.
-  const [prePauseRate, setPrePauseRate] = useState('default');
+  const [prePauseRate, setPrePauseRate] = useState(REFRESH_RATE_DEFAULT);
   const handleSelectRefreshRate = (value: string) => {
     if (value === 'manual' && refreshRate !== 'manual') setPrePauseRate(refreshRate);
     setRefreshRate(value);
@@ -3342,9 +3515,36 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [showSaveBookmarkModal, setShowSaveBookmarkModal] = useState(false);
   const [bookmarkName, setBookmarkName] = useState('');
   const [isSavingAsNew, setIsSavingAsNew] = useState(false);
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [showCopilot, setShowCopilot] = useState(false);
-  const [showContextGraph, setShowContextGraph] = useState(false);
+  // The right-side panels are siblings of the canvas rather than overlays, so at
+  // most one can be open — two 384px columns would leave the canvas too narrow to
+  // be the thing you are editing. One piece of state rather than a boolean each,
+  // so opening a panel closes whichever was open instead of stacking.
+  const [openPanel, setOpenPanel] = useState<
+    'layout' | 'contextGraph' | 'copilot' | 'versionHistory' | 'aiSummary' | null
+  >(null);
+  const showVersionHistory = openPanel === 'versionHistory';
+  const showCopilot = openPanel === 'copilot';
+  const showContextGraph = openPanel === 'contextGraph';
+  const showLayoutSettings = openPanel === 'layout';
+  // Toggling: clicking the button that opened a panel closes it again.
+  const togglePanel = (panel: typeof openPanel) =>
+    setOpenPanel((current) => (current === panel ? null : panel));
+  // The copilot composer's text, held here rather than in the textarea, so an AI
+  // summary's follow-up question can open the panel with the question already in
+  // it and the viewer can edit before sending.
+  const [copilotPrompt, setCopilotPrompt] = useState('');
+  // Which widget copilot is pointed at, when it was opened from one. null means
+  // the whole dashboard — the centre toolbar's button and an AI summary's
+  // follow-up both open it that way.
+  const [copilotSubjectId, setCopilotSubjectId] = useState<string | null>(null);
+  // Which AI summary's settings drawer is open, by widget id rather than a boolean:
+  // a dashboard can hold more than one summary, and the drawer has to know whose
+  // settings it is editing. Which panel is open still lives in openPanel — this is
+  // only the subject of the AI summary one.
+  const [aiSummarySettingsItemId, setAiSummarySettingsItemId] = useState<string | null>(null);
+  // Layout and appearance apply to the whole dashboard, so unlike a widget's
+  // settings they live on the builder rather than travelling with an item.
+  const [layoutSettings, setLayoutSettings] = useState<LayoutSettings>(createLayoutSettings);
   // Dismissing the canvas tip is sticky for the session — it shouldn't come back
   // every time the user toggles out of and back into edit mode.
   const [tipDismissed, setTipDismissed] = useState(false);
@@ -3368,6 +3568,21 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
   const contentItems = activeTab?.contentItems || [];
+  // Resolved from the current tab's items, so the drawer closes on its own if the
+  // summary it was editing is deleted or the author switches tabs.
+  const aiSummarySettingsItem =
+    isEditing && openPanel === 'aiSummary'
+      ? contentItems.find(item => item.id === aiSummarySettingsItemId)
+      : undefined;
+  // Resolved the same way, so copilot falls back to the whole dashboard on its own
+  // if the widget it was pointed at is deleted or the author switches tabs — a
+  // panel still naming a widget that is gone would be pointed at nothing.
+  const copilotSubject = copilotSubjectId
+    ? contentItems.find(item => item.id === copilotSubjectId)
+    : undefined;
+  const copilotPlaceholder = copilotSubject
+    ? `Ask copilot to edit ${copilotSubject.title}`
+    : 'Ask copilot to edit this dashboard';
 
   // Mock saved filtered views
   const savedFilteredViews = [
@@ -3557,6 +3772,29 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       setContentItems([...contentItems, newItem]);
       setSelectedTool(null);
       setSelectedItemId(id);
+    } else if (toolId === 'narrative') {
+      // Drop an AI summary. It lands fully revealed — full width so the headline
+      // has room to sit on one line beside its tags — and stays that way; there
+      // is nothing to open. White on the same border as a report, because it is a
+      // widget on the dashboard like any other: the tag in its corner says what
+      // wrote it, and a tinted surface on top of that was styling the whole box to
+      // make a point the tag already makes. An author can still tint it.
+      const id = `narrative-${Date.now()}`;
+      const size = { width: AI_SUMMARY_WIDTH, height: AI_SUMMARY_HEIGHT };
+      const newItem: ContentItem = {
+        id,
+        type: 'chart',
+        position: getNextPosition(size),
+        size,
+        title: 'AI summary',
+        content: {
+          ...createAiSummaryContent(),
+          style: { shadow: false, border: true, borderColor: '#e4e6e8', borderWidth: 1, bgColor: '#ffffff' },
+        },
+      };
+      setContentItems([...contentItems, newItem]);
+      setSelectedTool(null);
+      setSelectedItemId(id);
     } else {
       setSelectedTool(toolId === selectedTool ? null : toolId);
     }
@@ -3583,6 +3821,96 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         i.id === itemId ? { ...i, content: { ...i.content, ...patch } } : i
       )
     );
+  };
+
+  // A summary's follow-up question hands off to copilot rather than answering in
+  // place: the answer is a conversation, and copilot is where conversations about
+  // this dashboard already happen. The question lands in the composer instead of
+  // sending itself, so a viewer can edit it before asking.
+  const handleAskCopilot = (question: string) => {
+    setCopilotPrompt(question);
+    setCopilotSubjectId(null);
+    setOpenPanel('copilot');
+  };
+
+  // Pointing copilot at one widget. Opening from a widget's menu names that
+  // widget as the subject rather than dropping "the ticket volume chart" into the
+  // composer as text: the author already said which one by opening its menu, and
+  // a prompt they then have to edit around is worse than an empty one. The panel
+  // says what it is pointed at, and its suggestions are about that widget.
+  const handleCreateWithCopilot = (item: any) => {
+    setSelectedItemId(item.id);
+    setCopilotSubjectId(item.id);
+    setCopilotPrompt('');
+    setOpenPanel('copilot');
+  };
+
+  // Turning a report's own summary on or off. The card grows to make room for the
+  // band and shrinks back when it is removed, so the chart above it keeps the
+  // space it had — a summary that appears by squeezing the chart it describes
+  // would be a bad trade the author never agreed to.
+  const handleToggleReportSummary = (item: any) => {
+    const on = hasReportSummary(item.content);
+    setContentItems(items =>
+      items.map(i =>
+        i.id === item.id
+          ? {
+              ...i,
+              size: {
+                ...i.size,
+                height: on
+                  ? Math.max(120, i.size.height - REPORT_SUMMARY_EXTRA_HEIGHT)
+                  : i.size.height + REPORT_SUMMARY_EXTRA_HEIGHT,
+              },
+              content: {
+                ...i.content,
+                reportSummary: on ? { ...i.content?.reportSummary, enabled: false } : createReportSummary(i.title),
+              },
+            }
+          : i
+      )
+    );
+  };
+
+  // An underlined claim in the summary opens the report it was read from. The
+  // prototype has no report viewer wired to arbitrary names, so this logs the
+  // report the same way the widget toolbar's "open report" does.
+  const handleOpenAiSummarySource = (report: string) => {
+    console.log('Open source report', report);
+  };
+
+  // "Copy text" copies the summary as it reads on screen — the headline, then each
+  // section — because what people do with a summary is paste it into a ticket or a
+  // channel. The source markup is stripped to its visible label: `[x](Report)`
+  // means nothing outside this widget.
+  const handleCopyAiSummaryText = (content: any) => {
+    const plain = (s: string) => s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+    const lines: string[] = [];
+    // "AI summary" leads the paste because on screen it is a tag in the corner —
+    // pasted elsewhere there is no corner, and a takeaway with no attribution
+    // reads as the paster's own conclusion.
+    if (content?.takeaway?.text) {
+      lines.push('AI summary');
+      lines.push(plain(content.takeaway.text), '');
+    }
+    // Findings are pasted in the order they are ranked, each headline followed by
+    // the paragraph that argues it — the ranking is the summary's main claim, and
+    // a flat paste of nine sentences loses it.
+    (content?.findings || []).forEach((finding: any) => {
+      lines.push(finding.label);
+      lines.push(plain(finding.headline));
+      if (finding.insight) lines.push(plain(finding.insight));
+      // Neither the action nor the follow-up is pasted: both are prompts that open
+      // copilot, and a verb like "Review escalation path" in a pasted document is
+      // an instruction to nobody. The recommendation behind the action is not on
+      // screen either, and this copies the summary as it reads.
+      lines.push('');
+    });
+    const text = lines.join('\n').trim();
+    // Clipboard writes reject outside a secure context, so a failure is logged
+    // rather than left to an unhandled rejection.
+    navigator.clipboard?.writeText(text).catch((error) => console.log('Copy failed', error));
+    console.log('Copied AI summary text');
   };
 
   // Save the configured link back onto its widget, or drop the widget if the
@@ -3955,11 +4283,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 {toolbarItems.map((tool) => (
                   <FloraTooltip
                     key={tool.id}
-                    content={
-                      'disabled' in tool && tool.disabled
-                        ? `${tool.label} - Coming soon`
-                        : toolTooltip(tool.label, 'shortcut' in tool ? tool.shortcut : undefined)
-                    }
+                    content={toolTooltip(tool.label, tool.shortcut)}
                     placement="bottom"
                     size="small"
                   >
@@ -3967,12 +4291,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       variant={selectedTool === tool.id ? "secondary" : "ghost"}
                       size="sm"
                       aria-label={tool.label}
-                      aria-disabled={'disabled' in tool && tool.disabled ? true : undefined}
-                      onClick={() => {
-                        if ('disabled' in tool && tool.disabled) return;
-                        handleToolSelect(tool.id);
-                      }}
-                      className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN} ${'disabled' in tool && tool.disabled ? 'opacity-50 hover:!bg-transparent' : ''}`}
+                      onClick={() => handleToolSelect(tool.id)}
+                      className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
                     >
                       {tool.icon}
                     </Button>
@@ -4023,7 +4343,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     variant="ghost"
                     size="sm"
                     aria-label="Edit layout and appearance"
-                    onClick={() => console.log('Edit layout and appearance')}
+                    aria-expanded={showLayoutSettings}
+                    onClick={() => togglePanel('layout')}
                     className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
                   >
                     <Palette className={FLORA_TOOLBAR_ICON} />
@@ -4042,29 +4363,16 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   </Button>
                 </FloraTooltip>
 
-                <FloraTooltip content="Context graph" placement="bottom" size="small">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    aria-label="Context graph"
-                    aria-expanded={showContextGraph}
-                    onClick={() => setShowContextGraph(true)}
-                    className={`h-8 w-8 shrink-0 p-0 hover:!bg-white ${FLORA_BTN}`}
-                  >
-                    <FlowStroke className={FLORA_TOOLBAR_ICON} />
-                  </Button>
-                </FloraTooltip>
-
                 {/* Copilot is an AI affordance rather than an insert tool, so the
                     violet icon carries the distinction — and its hover state is a
                     circle rather than the square swatch the other tools use. */}
-                <FloraTooltip content="Edit with copilot" placement="bottom" size="small">
+                <FloraTooltip content="Create with copilot" placement="bottom" size="small">
                   <Button
                     variant="ghost"
                     size="sm"
-                    aria-label="Edit with copilot"
+                    aria-label="Create with copilot"
                     aria-expanded={showCopilot}
-                    onClick={() => setShowCopilot((prev) => !prev)}
+                    onClick={() => togglePanel('copilot')}
                     className={`h-8 w-8 shrink-0 p-0 ${FLORA_BTN} !rounded-full hover:!bg-[#8d59b1]/10`}
                   >
                     <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />
@@ -4359,29 +4667,19 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     {REFRESH_RATE_OPTIONS.map((option) => (
                       <React.Fragment key={option.value}>
                         <DropdownMenuItem
-                          className="gap-3 items-start"
+                          className="gap-3"
                           onClick={() => handleSelectRefreshRate(option.value)}
                         >
-                          <span className="flex w-4 shrink-0 items-center justify-center pt-0.5">
+                          <span className="flex w-4 shrink-0 items-center justify-center">
                             {refreshRate === option.value && (
                               <Check className={FLORA_MENU_ICON} style={{ width: 16, height: 16 }} />
                             )}
                           </span>
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="flex items-center gap-1.5">
-                              {option.value === 'manual' && (
-                                <Pause className={FLORA_MENU_ICON} style={{ width: 14, height: 14 }} />
-                              )}
-                              <MD tag="span" className="!text-foreground">{option.label}</MD>
-                              {option.isDefault && (
-                                <span className="ml-auto rounded-full bg-[#1f73b7]/10 px-2 py-0.5 text-[11px] font-medium leading-4 text-[#1f73b7]">
-                                  Every 60 sec
-                                </span>
-                              )}
-                            </span>
-                            {option.hint && !option.isDefault && (
-                              <MD tag="span" className="!text-[12px] !text-muted-foreground">{option.hint}</MD>
+                          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                            {option.value === 'manual' && (
+                              <Pause className={FLORA_MENU_ICON} style={{ width: 14, height: 14 }} />
                             )}
+                            <MD tag="span" className="!text-foreground">{option.label}</MD>
                           </span>
                         </DropdownMenuItem>
                         {option.value === 'manual' && <div className="border-t border-border -mx-2 my-1" />}
@@ -4406,6 +4704,25 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                {/* Context graph — a viewing affordance rather than an authoring
+                    one: it explains where the numbers on screen come from, which
+                    is a question a reader has, not a change an author makes. It
+                    sits with the other viewing chrome and takes the same bordered
+                    32px box, so it reads as part of that row rather than as a
+                    stray toolbar button. */}
+                <FloraTooltip content="Context graph" placement="bottom" size="small">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Context graph"
+                    aria-expanded={showContextGraph}
+                    onClick={() => togglePanel('contextGraph')}
+                    className={`${FLORA_BTN} !h-[32px] !w-[32px] shrink-0 !rounded-[8px] border border-[#dcdcda] bg-white !p-0 hover:bg-[#f8f9f9]`}
+                  >
+                    <FlowStroke className={FLORA_ICON} />
+                  </Button>
+                </FloraTooltip>
                 <div className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
                 </>
               )}
@@ -4438,7 +4755,14 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               <FloraButton
                 isPill
                 size="small"
-                onClick={() => setIsEditing(!isEditing)}
+                // Switching mode closes whatever panel is open. Most of them are
+                // about authoring and have no meaning to a reader, and the canvas
+                // is the thing that just changed — so the switch shows it in full
+                // rather than through a 384px slot.
+                onClick={() => {
+                  setIsEditing(!isEditing);
+                  setOpenPanel(null);
+                }}
                 className="dashboard-mode-toggle"
               >
                 <FloraButton.StartIcon>
@@ -4512,7 +4836,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   <DropdownMenuContent align="end" className="w-52">
                     {isEditing ? (
                       <>
-                        <DropdownMenuItem className="gap-2" onClick={() => setShowVersionHistory(true)}>
+                        <DropdownMenuItem className="gap-2" onClick={() => setOpenPanel('versionHistory')}>
                           <History className={FLORA_MENU_ICON} />
                           <MD tag="span" className="!text-foreground">Version history</MD>
                         </DropdownMenuItem>
@@ -4574,7 +4898,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         variant="ghost"
                         size="sm"
                         aria-label="Filter options"
-                        className={`w-[20px] shrink-0 p-0 hover:bg-muted ${FLORA_BTN} !h-[20px]`}
+                        className={`w-[20px] shrink-0 !p-0 hover:bg-muted ${FLORA_BTN} !h-[20px]`}
                       >
                         <MoreVertical className="!size-[12px] shrink-0 !text-[#646864]" />
                       </Button>
@@ -5262,10 +5586,36 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     <WidgetStyleControls
                       style={item.content?.style}
                       defaultBorderOn={item.type !== 'image'}
-                      enableCrossFilter={item.type === 'chart'}
+                      // The AI summary is a chart by type but not a report: it has
+                      // no source report to open and nothing to cross-filter, so it
+                      // gets its own settings panel in place of both.
+                      enableCrossFilter={item.type === 'chart' && !isAiSummaryChart(item.content?.chartType)}
                       onChange={(patch) => handleUpdateTextContent(item.id, { style: { ...(item.content?.style || {}), ...patch } })}
-                      onOpenReport={item.type === 'chart' ? () => console.log('Open report in builder', item.id) : undefined}
+                      onOpenReport={item.type === 'chart' && !isAiSummaryChart(item.content?.chartType) ? () => console.log('Open report in builder', item.id) : undefined}
                       onDelete={() => setContentItems(items => items.filter(i => i.id !== item.id))}
+                      // Offered on reports only: the dashboard-level AI summary
+                      // widget is already a summary, and section, image, text and
+                      // link widgets have no data to summarise.
+                      aiSummaryOn={hasReportSummary(item.content)}
+                      onToggleAiSummary={
+                        item.type === 'chart' && !isAiSummaryChart(item.content?.chartType)
+                          ? () => handleToggleReportSummary(item)
+                          : undefined
+                      }
+                      settingsLabel={isAiSummaryChart(item.content?.chartType) ? 'AI summary settings' : undefined}
+                      settingsActive={openPanel === 'aiSummary' && aiSummarySettingsItemId === item.id}
+                      onOpenSettings={
+                        isAiSummaryChart(item.content?.chartType)
+                          ? () => {
+                              // Clicking Settings on the summary whose panel is
+                              // already open closes it; on any other summary it
+                              // switches the panel to that one.
+                              const isOpen = openPanel === 'aiSummary' && aiSummarySettingsItemId === item.id;
+                              setAiSummarySettingsItemId(isOpen ? null : item.id);
+                              setOpenPanel(isOpen ? null : 'aiSummary');
+                            }
+                          : undefined
+                      }
                     />
                   </div>
                 )}
@@ -5278,7 +5628,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         // own, so they carry the breathing room themselves — most
                         // of it below the body, which is where bands ran tight.
                         ? 'px-3 pt-3 pb-7'
-                        : 'p-3'
+                        : isAiSummaryChart(item.content?.chartType)
+                          // The AI summary holds cards inside a card, so it needs
+                          // the outer inset a report's single chart does not.
+                          ? 'p-5'
+                          : 'p-3'
                   }`}
                   style={{ backgroundColor: wBg }}
                 >
@@ -5288,7 +5642,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     className={`flex items-center justify-between gap-2 ${
                       item.type === 'image' ||
                       isServiceOpsChromeless(item.content?.chartType) ||
-                      isMonitoringChromeless(item.content?.chartType)
+                      isMonitoringChromeless(item.content?.chartType) ||
+                      isAiSummaryChart(item.content?.chartType)
                         ? 'hidden'
                         : isSectionWidget
                           ? 'mb-5'
@@ -5306,9 +5661,14 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           placement="bottom"
                           size="small"
                         >
-                          {/* Widget titles rank by size, not weight: medium at
-                              18px reads as a heading without shouting. */}
-                          <span className="min-w-0 truncate text-foreground text-[18px] font-medium">
+                          {/* Report titles stay deliberately quiet: 12px regular
+                              labels the widget without competing with the figure
+                              it frames. Section panels carry their own heading
+                              text items, so nothing here needs to lead.
+                              leading-[16px] in px, not leading-4 — the 14px root
+                              font size makes 1rem resolve to 14px, which would
+                              crowd the label. */}
+                          <span className="min-w-0 truncate text-foreground text-[12px] font-normal leading-[16px]">
                             {item.title}
                           </span>
                         </FloraTooltip>
@@ -5324,7 +5684,9 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                             onClick={(e) => e.stopPropagation()}
                             aria-label="Widget description"
                           >
-                            <InfoStroke className="size-4 shrink-0" style={{ width: 16, height: 16 }} />
+                            {/* Tracks the title it annotates, so the icon does
+                                not outweigh a 12px label. */}
+                            <InfoStroke className="shrink-0" style={{ width: 14, height: 14 }} />
                           </span>
                         </FloraTooltip>
                       )}
@@ -5393,6 +5755,15 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                                   <ExternalLink className={FLORA_MENU_ICON} />
                                   <MD tag="span" className="!text-foreground">Open report</MD>
                                 </DropdownMenuItem>
+                                {/* Editing this one report by describing the change,
+                                    rather than by finding the control for it. The
+                                    violet glyph marks it as the AI affordance in a
+                                    menu of direct ones — same distinction the centre
+                                    toolbar draws for its copilot button. */}
+                                <DropdownMenuItem className="gap-3" onClick={() => handleCreateWithCopilot(item)}>
+                                  <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />
+                                  <MD tag="span" className="!text-foreground">Create with copilot</MD>
+                                </DropdownMenuItem>
                                 <div className="border-t border-border my-1" />
                                 <DropdownMenuItem
                                   className="gap-3 focus:bg-[#c72a1c]/10 data-[highlighted]:bg-[#c72a1c]/10"
@@ -5434,6 +5805,28 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   {/* Support operations monitoring widgets. */}
                   {isMonitoringChart(item.content?.chartType) && (
                     <MonitoringChart content={item.content} />
+                  )}
+
+                  {/* AI summary: takeaway, then ranked findings, always revealed. */}
+                  {isAiSummaryChart(item.content?.chartType) && (
+                    <AiSummaryCard
+                      content={item.content}
+                      onAskCopilot={handleAskCopilot}
+                      onOpenSource={handleOpenAiSummarySource}
+                      // In edit mode only: the menu's actions are the author's,
+                      // and a viewer's copy of the dashboard shouldn't offer to
+                      // delete a widget from it.
+                      headerAction={
+                        isEditing ? (
+                          <AiSummaryOverflowMenu
+                            onCopyText={() => handleCopyAiSummaryText(item.content)}
+                            onShare={() => console.log('Share AI summary', item.id)}
+                            onCreateWithCopilot={() => handleCreateWithCopilot(item)}
+                            onDelete={() => setContentItems(items => items.filter(i => i.id !== item.id))}
+                          />
+                        ) : undefined
+                      }
+                    />
                   )}
 
                   {/* Chart content */}
@@ -6001,6 +6394,19 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       )}
                     </div>
                   )}
+
+                  {/* The report's own AI summary, under the chart it describes.
+                      Last in the card so it reads as a note on everything above
+                      it, and shrink-0 so the chart absorbs the resizing rather
+                      than the summary being squeezed to one clipped line. */}
+                  {hasReportSummary(item.content) && (
+                    <ReportSummaryBand
+                      summary={item.content.reportSummary}
+                      onAskCopilot={handleAskCopilot}
+                      onOpenSource={handleOpenAiSummarySource}
+                      onRemove={isEditing ? () => handleToggleReportSummary(item) : undefined}
+                    />
+                  )}
                 </div>
               </div>
               );
@@ -6015,7 +6421,10 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           </div>
           </div>
 
-          {/* Floating suggestions — editing only, and only until dismissed */}
+          {/* Floating suggestions — editing only, and only until dismissed.
+              Unmounted in view mode rather than hidden, so the entrance replays
+              the next time an author enters edit mode: the offer is being made
+              again, and a row that silently reappears is easy to miss. */}
           {isEditing && !tipDismissed && (
             <DashboardSuggestions
               onDismiss={() => setTipDismissed(true)}
@@ -6260,131 +6669,157 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         </DialogContent>
       </Dialog>
 
-      {/* Context graph — opens from the centre toolbar's flow button. The body is
-          intentionally empty for now; only the shell exists. */}
-      <Drawer open={showContextGraph} onOpenChange={setShowContextGraph} direction="right" modal={false}>
-        <DrawerContent
-          // The shared DrawerContent sets `w-3/4 sm:max-w-sm` behind a
-          // direction variant, so the width has to come from an inline style
-          // to win. Matches the Analyst copilot drawer in TopBar.
-          className="fixed right-0 z-50 flex flex-col overflow-hidden rounded-[24px] border-l border-border bg-background"
-          style={{ top: 56, height: 'calc(100vh - 64px)', width: 420, maxWidth: 420 }}
-        >
-          <DrawerHeader className="border-b border-border">
-            <div className="flex items-center justify-between">
-              <DrawerTitle className="text-base font-medium">Context graph</DrawerTitle>
-              <DrawerClose asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Close context graph"
-                  className={FLORA_ICON_BTN}
-                >
-                  <X className={FLORA_ICON} />
-                </Button>
-              </DrawerClose>
-            </div>
-            <DrawerDescription className="sr-only">
-              The relationships between this dashboard and the data it draws on
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="flex-1 overflow-y-auto" />
-        </DrawerContent>
-      </Drawer>
-
-      {/* Copilot Side Panel — opens from the centre toolbar's sparkle button */}
-      {showCopilot && (
-        <div className="w-96 shrink-0 h-full bg-white rounded-[24px] overflow-hidden flex flex-col">
-          <div className="border-b border-border px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="flex shrink-0 items-center justify-center" aria-hidden>
-                  <Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />
-                </span>
-                <div>
-                  <h3 className="text-base font-normal">Copilot</h3>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Close copilot"
-                className={FLORA_ICON_BTN}
-                onClick={() => setShowCopilot(false)}
-              >
-                <X className={FLORA_ICON} />
-              </Button>
-            </div>
-            <p className="text-base text-muted-foreground mt-1">
-              Describe a change and copilot will edit the dashboard for you
-            </p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="space-y-2">
-              <MD tag="span" className="!text-muted-foreground">Try asking</MD>
-              {[
-                'Add a CSAT trend chart for the last quarter',
-                'Group these reports into a section',
-                'Switch the ticket volume chart to a bar chart',
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  onClick={() => console.log('Copilot prompt:', suggestion)}
-                  className="flex w-full items-start gap-2 rounded-[8px] border border-[#dcdcda] px-3 py-2 text-left transition-colors hover:bg-muted/50"
-                >
-                  <Sparkles className={`${FLORA_ICON} mt-0.5`} />
-                  <MD tag="span" className="!text-foreground">{suggestion}</MD>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t border-border px-6 py-4">
-            <FloraTextarea
-              rows={3}
-              placeholder="Ask copilot to edit this dashboard"
-              aria-label="Ask copilot to edit this dashboard"
-              isResizable={false}
-            />
-            <div className="mt-2 flex justify-end">
-              <FloraButton
-                isPrimary
-                isPill
-                size="small"
-                onClick={() => console.log('Send to copilot')}
-              >
-                Send
-              </FloraButton>
-            </div>
-          </div>
-        </div>
+      {/* Edit layout and appearance — opens from the centre toolbar's palette
+          button. Every setting in it changes what the canvas looks like, so it is
+          a sibling of the canvas rather than an overlay over it. */}
+      {showLayoutSettings && (
+        <LayoutSettingsDrawer
+          settings={layoutSettings}
+          onSave={setLayoutSettings}
+          onClose={() => setOpenPanel(null)}
+        />
       )}
 
-      {/* Version History Side Panel */}
-      {showVersionHistory && (
-        <div className="w-96 shrink-0 h-full bg-white rounded-[24px] overflow-hidden flex flex-col">
-          <div className="border-b border-border px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-normal">Version history</h3>
-                <p className="text-base text-muted-foreground mt-1">
-                  Recent changes to this dashboard
-                </p>
+      {/* Context graph — opens from the viewing controls in the header. It answers
+          a reader's question about the dashboard in front of them rather than an
+          author's about the one they are building, so it is the one panel that
+          belongs to view mode. Same shell as the others; the body is
+          intentionally empty for now. */}
+      {showContextGraph && (
+        <BuilderDrawer
+          icon={<FlowStroke className="size-[16px] shrink-0 text-foreground" />}
+          title="Context graph"
+          description="How this dashboard relates to the data it draws on"
+          closeLabel="Close context graph"
+          onClose={() => setOpenPanel(null)}
+        />
+      )}
+
+      {/* AI summary settings — opens from the selected summary's toolbar. A
+          sibling of the canvas like copilot, so configuring the summary narrows
+          the canvas rather than covering the widget being configured. */}
+      {aiSummarySettingsItem && (
+        <AiSummarySettingsDrawer
+          // Keyed by widget: the drawer holds unsaved edits as a draft, and
+          // opening a different summary's settings has to start from that
+          // summary's own saved state rather than inherit the last one's draft.
+          key={aiSummarySettingsItem.id}
+          settings={aiSummarySettingsItem.content?.settings || createAiSummarySettings()}
+          onSave={(next) =>
+            handleUpdateTextContent(aiSummarySettingsItem.id, { settings: next })
+          }
+          onClose={() => {
+            setAiSummarySettingsItemId(null);
+            setOpenPanel(null);
+          }}
+        />
+      )}
+
+      {/* Create with copilot — opens from the centre toolbar's sparkle button for
+          the dashboard, or from a widget's overflow menu for that widget. The
+          composer is a footer rather than part of the scroll, so it stays
+          reachable however far the conversation above it has run. */}
+      {showCopilot && (
+        <BuilderDrawer
+          icon={<Sparkles className="size-[16px] shrink-0 !text-[#8d59b1]" />}
+          title="Create with copilot"
+          // The description names what copilot is pointed at, because that is the
+          // one thing an author has to be sure of before typing: the same sentence
+          // means two different edits depending on the scope.
+          description={
+            copilotSubject
+              ? `Describe a change to ${copilotSubject.title}`
+              : 'Describe what you want and copilot will build it on this dashboard'
+          }
+          closeLabel="Close copilot"
+          onClose={() => setOpenPanel(null)}
+          bodyClassName="px-6 py-4"
+          footer={
+            <div className="w-full">
+              <FloraTextarea
+                rows={3}
+                placeholder={copilotPlaceholder}
+                aria-label={copilotPlaceholder}
+                isResizable={false}
+                value={copilotPrompt}
+                onChange={(event) => setCopilotPrompt(event.target.value)}
+              />
+              <div className="mt-2 flex justify-end">
+                <FloraButton
+                  isPrimary
+                  isPill
+                  size="small"
+                  disabled={!copilotPrompt.trim()}
+                  onClick={() => {
+                    console.log('Send to copilot:', copilotSubjectId ?? 'dashboard', copilotPrompt);
+                    setCopilotPrompt('');
+                  }}
+                >
+                  Send
+                </FloraButton>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={FLORA_ICON_BTN}
-                onClick={() => setShowVersionHistory(false)}
-              >
-                <X className={FLORA_ICON} />
-              </Button>
             </div>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          }
+        >
+          {/* A chip naming the widget copilot is pointed at, with a way back out
+              to the whole dashboard. Scope is the one thing about this panel that
+              is not visible from its contents, so it is stated rather than
+              implied — and reversible in place, because an author who opened the
+              wrong widget's menu shouldn't have to close and start again. */}
+          {copilotSubject && (
+            <div className="mb-4 flex items-center gap-2 rounded-[8px] border border-[#dcdcda] bg-muted/40 px-3 py-2">
+              <BarChartIcon className={`${FLORA_MENU_ICON} shrink-0`} />
+              <MD tag="span" className="min-w-0 flex-1 truncate !text-foreground">
+                {copilotSubject.title}
+              </MD>
+              <button
+                type="button"
+                aria-label="Edit the whole dashboard instead"
+                onClick={() => setCopilotSubjectId(null)}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#68737d] transition-colors hover:bg-black/5 hover:text-foreground"
+              >
+                <X className="shrink-0" style={{ width: 12, height: 12 }} />
+              </button>
+            </div>
+          )}
+
+          {/* The same pills an AI summary offers on the canvas: both are a prompt
+              you can take rather than type, and rendering them two different ways
+              would say they were two different kinds of thing. Clicking one fills
+              the composer rather than sending, so it stays editable.
+              Scoped to the subject — suggestions about the other widgets on the
+              canvas are noise when copilot is pointed at one of them. */}
+          <AiSuggestionList
+            heading="Try asking"
+            suggestions={
+              copilotSubject
+                ? [
+                    'Change this to a bar chart',
+                    'Add a comparison to the previous period',
+                    'Break this down by channel',
+                  ]
+                : [
+                    'Add a CSAT trend chart for the last quarter',
+                    'Group these reports into a section',
+                    'Switch the ticket volume chart to a bar chart',
+                  ]
+            }
+            onSelect={setCopilotPrompt}
+          />
+        </BuilderDrawer>
+      )}
+
+      {/* Version history — opens from the overflow menu. Same shell as the other
+          right-side panels. */}
+      {showVersionHistory && (
+        <BuilderDrawer
+          icon={<History className="size-[16px] shrink-0 text-foreground" style={{ width: 16, height: 16 }} />}
+          title="Version history"
+          description="Recent changes to this dashboard"
+          closeLabel="Close version history"
+          onClose={() => setOpenPanel(null)}
+          bodyClassName="px-6 py-4"
+        >
             <div className="space-y-4">
               {versionHistory.map((version, index) => {
                 const date = new Date(version.timestamp);
@@ -6428,8 +6863,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 );
               })}
             </div>
-          </div>
-        </div>
+        </BuilderDrawer>
       )}
     </div>
   );

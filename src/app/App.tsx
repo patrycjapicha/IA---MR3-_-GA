@@ -40,14 +40,31 @@ interface DashboardTab {
   data?: any;
 }
 
+// The prototype boots with a brand-new dashboard tab already open.
+const createInitialDashboardTab = (): DashboardTab => ({
+  id: 'dashboard-initial',
+  title: 'Untitled dashboard',
+  type: 'dashboard',
+  isActive: true,
+  data: {
+    dashboardType: 'analytics',
+    section: 'overview',
+    isNew: true,
+    dashboardName: 'Untitled dashboard',
+    projectName: 'My project',
+    createdAt: new Date().toISOString()
+  }
+});
+
 export default function App() {
   const [appState, setAppState] = useState<AppState>('dashboard');
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [currentSection, setCurrentSection] = useState<string>('home');
   const [notifications, setNotifications] = useState<SlackNotification[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState<number>(0);
-  const [openTabs, setOpenTabs] = useState<DashboardTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [initialTab] = useState<DashboardTab>(createInitialDashboardTab);
+  const [openTabs, setOpenTabs] = useState<DashboardTab[]>([initialTab]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(initialTab.id);
   const [notificationsDrawerOpen, setNotificationsDrawerOpen] = useState<boolean>(false);
   const [showAnalyticsAssistant, setShowAnalyticsAssistant] = useState<boolean>(false);
   const [assistantQuery, setAssistantQuery] = useState<string>('');

@@ -191,12 +191,14 @@ function KpiTile({ content }: { content: any }) {
 function NarrativeCard({ content }: { content: any }) {
   return (
     <div className="flex h-full flex-col gap-3 px-5 py-4">
+      {/* The sparkle is the provenance and it is enough of it. The "AI summary"
+          pill that used to sit opposite the heading now names a different thing —
+          the dashboard carries the real AI summary widget, and a second card
+          wearing its label reads as a second summary rather than as the written
+          commentary this is. */}
       <div className="flex items-center gap-2">
         <SparklesStroke style={{ width: 16, height: 16, color: '#5b4bc4' }} />
         <span className="text-base font-medium" style={{ color: INK }}>{content.heading}</span>
-        <span className="ml-auto rounded-full bg-white/70 px-2 py-0.5 text-sm" style={{ color: INK_2 }}>
-          AI summary
-        </span>
       </div>
       <p className="text-sm leading-relaxed" style={{ color: INK }}>{content.summary}</p>
       <ul className="mt-auto space-y-1.5">
