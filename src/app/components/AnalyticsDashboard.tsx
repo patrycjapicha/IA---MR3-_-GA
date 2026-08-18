@@ -323,7 +323,7 @@ export function AnalyticsDashboard({ type, data, onReportGeneration, onCreateDas
           <div className="flex-1 min-w-0 overflow-hidden m-1">
           <DashboardBuilder 
             key={activeTabId} 
-            dashboardTitle={activeTab?.data?.dashboardName || activeTab?.title || 'Untitled dashboard'}
+            dashboardTitle={activeTab?.data?.dashboardName || activeTab?.title || 'New dashboard'}
             projectName={activeTab?.data?.projectName}
             onClose={() => {
               // Close the active tab

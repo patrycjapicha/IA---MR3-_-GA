@@ -40,17 +40,23 @@ interface DashboardTab {
   data?: any;
 }
 
-// The prototype boots with a brand-new dashboard tab already open.
+// The prototype boots with the Support Tickets dashboard already open, as a
+// reader would find it: named, populated, and in view mode. `isDefaultDashboard`
+// separates it from a dashboard the user creates while the prototype is running
+// (which starts blank, unnamed, and in edit mode).
+const DEFAULT_DASHBOARD_NAME = 'Support Tickets';
+
 const createInitialDashboardTab = (): DashboardTab => ({
   id: 'dashboard-initial',
-  title: 'Untitled dashboard',
+  title: DEFAULT_DASHBOARD_NAME,
   type: 'dashboard',
   isActive: true,
   data: {
     dashboardType: 'analytics',
     section: 'overview',
     isNew: true,
-    dashboardName: 'Untitled dashboard',
+    isDefaultDashboard: true,
+    dashboardName: DEFAULT_DASHBOARD_NAME,
     projectName: 'My project',
     createdAt: new Date().toISOString()
   }
@@ -116,13 +122,13 @@ export default function App() {
     // Create a new dashboard tab
     const newDashboardData = {
       id: dashboardId,
-      title: 'Untitled dashboard',
+      title: 'New dashboard',
       type: 'dashboard' as const,
       data: {
         dashboardType: 'analytics',
         section: 'overview',
         isNew: true,
-        dashboardName: 'Untitled dashboard',
+        dashboardName: 'New dashboard',
         projectName: 'My project',
         createdAt: new Date().toISOString()
       }

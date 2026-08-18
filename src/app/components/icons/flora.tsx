@@ -158,6 +158,7 @@ import Undo2Icon from '@zendesk-ui/assets/icons/20px/arrow-reverse-fill.svg?reac
 import Undo2StrokeIcon from '@zendesk-ui/assets/icons/20px/arrow-reverse-stroke.svg?react';
 import Redo2Icon from '@zendesk-ui/assets/icons/20px/arrow-rotate-right.svg?react';
 import ArrowRotateRightIcon from '@zendesk-ui/assets/icons/20px/arrow-rotate-right.svg?react';
+import ArrowDiagonalOutIcon from '@zendesk-ui/assets/icons/20px/arrow-diagonal-out.svg?react';
 import TerminalStrokeIcon from '@zendesk-ui/assets/icons/20px/terminal-stroke.svg?react';
 import UndoReturnIcon from '@zendesk-ui/assets/icons/20px/arrow-curve-left.svg?react';
 import RedoReturnIcon from '@zendesk-ui/assets/icons/20px/arrow-curve-right.svg?react';
@@ -354,6 +355,7 @@ export const floraSearchInputWrapperStyle = (width: number | string = '100%') =>
 });
 export const RefreshCw = RefreshCwIcon;
 export const ArrowRotateRight = ArrowRotateRightIcon;
+export const ArrowDiagonalOut = ArrowDiagonalOutIcon;
 export const TerminalStroke = TerminalStrokeIcon;
 export const Save = SaveIcon;
 export const SaveStroke = SaveStrokeIcon;

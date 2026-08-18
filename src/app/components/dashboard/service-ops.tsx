@@ -42,12 +42,34 @@ import {
 
 // ---- Tokens ---------------------------------------------------------------
 
-// Categorical slots, in fixed order. Validated as a set against the white card
-// surface: worst all-pairs CVD ΔE 9.2, normal-vision ΔE 24.0.
+// Categorical slots, in fixed order — the same hues the builder's background and
+// border pickers offer (TEXT_STYLE_PALETTE in DashboardBuilder), so a series and a
+// card tint come out of one set rather than two that nearly match.
+//
+// Assigned in this order and never cycled: a chart with two series uses blue then
+// orange, whatever the series are. Order is not arbitrary — it is the order the
+// set was validated in, and the two closest hues (violet and indigo) are kept
+// non-adjacent.
+//
+// Validated against the white card surface at 3, 5 and 6 slots: lightness band,
+// chroma floor, adjacent-pair CVD separation, normal-vision floor and 3:1 contrast
+// all pass. Worst adjacent pair is aqua↔orange at CVD ΔE 10.6 (protan) and 21.9
+// normal-vision; at 5+ slots it is red↔violet at 16.9 normal-vision.
+//
+// Orange is one step darker than the picker's own #FCA347. That swatch is a card
+// tint, where it sits under text and only has to be light; as a mark on white it
+// is 1.95:1 and outside the lightness band, so a bar drawn in it disappears. Same
+// hue, darkened until it passed.
 export const SERIES = {
-  blue: '#2a78d6',
-  orange: '#eb6834',
-  aqua: '#1baf7a',
+  blue: '#2694D6',
+  orange: '#D2761A',
+  aqua: '#26A178',
+  // Slots 4–6, for the charts that plot more than three categories. Red is a
+  // series slot here, not a state: status colours stay reserved to STATUS below
+  // and never stand in for a category.
+  violet: '#B276CD',
+  red: '#EB5C69',
+  indigo: '#698CD3',
 };
 // Not a categorical slot — the documented fold for a long tail of categories.
 const OTHER = '#b0b3ae';

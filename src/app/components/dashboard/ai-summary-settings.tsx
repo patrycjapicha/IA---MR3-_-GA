@@ -6,23 +6,22 @@
 // viewer.
 //
 // It lives in a right-side drawer alongside copilot rather than in a popover over
-// the canvas: there are seven settings, and an author changing them wants to see
-// the summary they are changing. The drawer is a sibling of the canvas — the same
-// pattern as copilot — so opening it narrows the canvas instead of covering the
-// widget being configured.
+// the canvas: an author changing these wants to see the summary they are
+// changing. The drawer is a sibling of the canvas — the same pattern as copilot —
+// so opening it narrows the canvas instead of covering the widget being
+// configured.
 //
-// Layout: three collapsible groups in the order an author actually decides in —
-// what the summary reads (source and focus), what it says (content), then what a
-// viewer can do with it (interaction). All three open by default, because the
-// point of collapsing is to park a group you are done with, not to hide the form
-// from someone who just opened it.
+// Layout: two collapsible groups in the order an author actually decides in —
+// what the summary reads (source and focus), then what it says (content). Both
+// open by default, because the point of collapsing is to park a group you are
+// done with, not to hide the form from someone who just opened it.
 //
 // Controls come from builder-drawer's compact vocabulary, shared with the
 // builder's other drawers, so all four match the density of the rest of the
 // builder's chrome rather than each inventing its own.
 import React, { useMemo, useState } from 'react';
 // Combobox reads its own Field context, which is a different export from the
-// forms Field the checkbox and toggle rows use — hence both imports.
+// forms Field the input rows use — hence both imports.
 import {
   Button,
   Combobox,
@@ -30,7 +29,6 @@ import {
   Field,
   Input,
   Option,
-  Toggle,
 } from '@zendesk-ui/react-components';
 import { PencilSparkleStroke } from '../icons/flora';
 import {
@@ -44,7 +42,6 @@ import {
 } from './builder-drawer';
 
 export const SUMMARIZE_SOURCES = ['Current tab', 'Entire dashboard'] as const;
-export const SUMMARY_PURPOSES = ['Operational monitoring', 'Performance review'] as const;
 export const SUMMARY_TONES = ['Concise', 'Balanced', 'Detailed'] as const;
 export const COMPARISON_PERIODS = [
   'Previous comparable period',
@@ -74,9 +71,7 @@ export const PRIMARY_REPORT_OPTIONS = [
 export interface AiSummarySettings {
   source: string;
   primaryReports: string[];
-  purpose: string;
   tone: string;
-  allowCopilotFollowUps: boolean;
   comparisonPeriod: string;
   customComparison: string;
   maxInsights: string;
@@ -87,9 +82,7 @@ export interface AiSummarySettings {
 export const createAiSummarySettings = (): AiSummarySettings => ({
   source: 'Entire dashboard',
   primaryReports: [],
-  purpose: 'Operational monitoring',
   tone: 'Balanced',
-  allowCopilotFollowUps: true,
   comparisonPeriod: 'Previous comparable period',
   customComparison: '',
   maxInsights: '4',
@@ -219,7 +212,7 @@ export function AiSummarySettingsPanel({
   const s = { ...createAiSummarySettings(), ...settings };
 
   return (
-    <DrawerAccordion sectionCount={3}>
+    <DrawerAccordion sectionCount={2}>
       {/* ---- Source and focus --------------------------------------------- */}
       <DrawerAccordionSection label="Source and focus">
         <SelectRow
@@ -236,12 +229,11 @@ export function AiSummarySettingsPanel({
 
       {/* ---- Summary content ---------------------------------------------- */}
       <DrawerAccordionSection label="Summary content">
-        <SelectRow
-          label="Summary purpose"
-          value={s.purpose}
-          options={SUMMARY_PURPOSES}
-          onChange={(purpose) => onChange({ purpose })}
-        />
+        {/* No "summary purpose" here. It offered a choice between operational
+            monitoring and performance review, which is a claim about what the
+            author is doing rather than an instruction to the summary — the range,
+            the comparison and the primary reports already say it, and the widget
+            reads the same either way. */}
         <SelectRow
           label="Tone and level of detail"
           value={s.tone}
@@ -278,18 +270,10 @@ export function AiSummarySettingsPanel({
         />
       </DrawerAccordionSection>
 
-      {/* ---- Viewer interaction ------------------------------------------- */}
-      <DrawerAccordionSection label="Viewer interaction">
-        <Field className={COMPACT_LABEL}>
-          <Toggle
-            isCompact
-            checked={s.allowCopilotFollowUps}
-            onChange={(event) => onChange({ allowCopilotFollowUps: event.target.checked })}
-          >
-            <Field.Label>Allow follow-up questions in Copilot</Field.Label>
-          </Toggle>
-        </Field>
-      </DrawerAccordionSection>
+      {/* There is no "viewer interaction" section any more. It held one toggle,
+          for follow-up questions in copilot, and the summary no longer offers
+          any — a setting for an affordance that cannot appear is a control that
+          promises the author something the widget will not do. */}
     </DrawerAccordion>
   );
 }

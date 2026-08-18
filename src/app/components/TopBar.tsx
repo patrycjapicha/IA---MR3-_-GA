@@ -19,7 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import AvatarComponent from '../imports/Avatar';
 
 const FLORA_MENU_ICON = 'size-[16px] shrink-0 text-muted-foreground';
-const FLORA_HEADER_ICON = 'size-[20px] shrink-0 text-muted-foreground';
+// Flora's default 20px glyph — the top bar's search and help sit at asset size.
+const FLORA_HEADER_ICON = '!size-[20px] shrink-0 text-muted-foreground';
 const FLORA_BTN_ICON = '!size-[16px] shrink-0';
 const FLORA_TAB_ICON = 'size-[16px] shrink-0';
 const FLORA_RECT_RADIUS = 'rounded-[8px]';
@@ -27,13 +28,14 @@ const FLORA_RECT_RADIUS = 'rounded-[8px]';
 const FLORA_NAV_WIDTH = 'w-[56px]';
 const FLORA_NAV_ICON_WRAPPER = 'size-[32px] flex items-center justify-center rounded-[8px] text-foreground';
 const FLORA_HEADER_CLASS =
-  'sticky top-0 z-50 relative flex items-center py-[8px] pr-[8px] pl-0 gap-[8px] box-border whitespace-nowrap bg-[#F7F7F7] shrink-0';
+  'flora-header sticky top-0 z-50 relative flex items-center py-[8px] pr-[8px] pl-0 gap-[8px] box-border whitespace-nowrap bg-[#F7F7F7] shrink-0';
 const FLORA_HEADER_CONTROL = 'h-[32px] shrink-0';
 const FLORA_TAB = FLORA_RECT_RADIUS;
 
-// Tab titles are clamped to 120px. The tooltip only earns its place when the
-// name is actually cut off, so measure the rendered span and show the tooltip
-// only when the text overflows.
+// Tab titles are clamped to 140px — the room a two-word dashboard name takes at
+// the 14px tabs now run on ("New dashboard" needs 124px). The tooltip only
+// earns its place when the name is actually cut off, so measure the rendered span
+// and show the tooltip only when the text overflows.
 function TruncatedTabTitle({ title, className }: { title: string; className?: string }) {
   const spanRef = React.useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -46,7 +48,7 @@ function TruncatedTabTitle({ title, className }: { title: string; className?: st
       if (node) setIsTruncated(node.scrollWidth > node.clientWidth + 1);
     };
     measure();
-    // The clamped span is always 120px wide, so a ResizeObserver on it never
+    // The clamped span is always 140px wide, so a ResizeObserver on it never
     // fires again. Re-measure once layout settles and once webfonts land, since
     // both change the text's rendered width.
     const raf = requestAnimationFrame(measure);
@@ -64,8 +66,11 @@ function TruncatedTabTitle({ title, className }: { title: string; className?: st
   // The measured span keeps its own ref, so the tooltip gets a separate wrapper
   // to clone its ref onto.
   const label = (
-    <span ref={spanRef} className="block truncate max-w-[120px]">
-      <MD tag="span" className={className}>{title}</MD>
+    <span ref={spanRef} className="block truncate max-w-[140px]">
+      {/* 14px, the same step as the dashboard's own tab strip: both name a view,
+          so a tab reads at one size wherever it appears — even though the rest of
+          the header's controls stay at 12px. */}
+      <SM tag="span" className={`!text-[14px] !leading-[20px] ${className ?? ''}`}>{title}</SM>
     </span>
   );
 
@@ -562,6 +567,7 @@ Automate this action with a trigger to reduce manual triage and help improve res
         ) : (
           <IconButton
             size="small"
+            className="flora-header-icon-20"
             onClick={() => setIsSearchOpen(true)}
             aria-label="Search analytics"
           >
@@ -637,8 +643,26 @@ Automate this action with a trigger to reduce manual triage and help improve res
         {/* Flora Header.Separator — right side of Open Explore */}
         <hr className="h-[24px] w-px border-0 bg-border shrink-0 mx-[4px]" aria-hidden="true" />
 
+        {/* Analyst copilot — the gradient fill marks it as the one AI entry
+            point in the header, so it reads as its own thing beside the plain
+            monochrome utilities. */}
+        <button
+          type="button"
+          onClick={() => onToggleAnalyticsAssistant?.(!showAnalyticsAssistant)}
+          aria-label="Analyst copilot"
+          aria-pressed={showAnalyticsAssistant}
+          className="flex size-[32px] shrink-0 items-center justify-center rounded-[8px] transition-opacity hover:opacity-90"
+          style={{
+            backgroundImage:
+              'linear-gradient(135deg, rgb(141, 89, 177) 20%, rgb(64, 108, 196) 125%)',
+          }}
+        >
+          <Sparkles className="size-[16px] shrink-0 !text-white" />
+        </button>
+
         <IconButton
           size="small"
+          className="flora-header-icon-20"
           onClick={() => setShowHelpCenter(!showHelpCenter)}
           aria-label="Help"
         >

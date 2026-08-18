@@ -285,6 +285,17 @@ html {
   font-size: var(--font-size);
 }
 
+/* Filter chips open the value panel in both editing and viewing, so they need a
+   hover state that reads as clickable rather than as static metadata. */
+button.dashboard-active-filter:hover {
+  border-color: #b9b9b7;
+  background-color: #f7f7f7;
+}
+
+button.dashboard-active-filter[data-state='open'] {
+  border-color: #646864;
+}
+
 .dashboard-active-filter-tag {
   margin: 0 !important;
   height: 20px !important;
@@ -309,13 +320,20 @@ html {
   gap: 4px;
 }
 
+/* Tabs read at 14px, the same step as the report titles on the canvas below:
+   they name the sections of a dashboard, so they sit a step above the 12px the
+   rest of the chrome runs on.
+
+   The padding is deliberately lopsided: 4px below sits the label close to the
+   underline that marks it, so the two read as one mark, while the 8px above
+   keeps the tab off the toolbar overhead. */
 .dashboard-tab-bar [data-garden-id='tabs.tab'] {
   display: inline-flex;
   align-items: center;
-  font-size: 12px !important;
-  line-height: 16px !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
   padding-top: 8px !important;
-  padding-bottom: 8px !important;
+  padding-bottom: 4px !important;
   border-top: none !important;
   border-left: none !important;
   border-right: none !important;
@@ -348,9 +366,33 @@ html {
   height: 16px !important;
 }
 
-.dashboard-history-actions [data-garden-id='buttons.icon_button'] svg {
+/* Garden sizes an icon button's own svg, so the 16px the dashboard chrome runs
+   on has to be restated here to win — Flora re-clones the icon it is handed and
+   drops the size class with it, so the class alone never lands. (The avatar
+   button holds an image, not an svg, and is untouched by this.) */
+.dashboard-history-actions [data-garden-id='buttons.icon_button'] svg,
+.flora-header [data-garden-id='buttons.icon_button']:not(.flora-header-icon-20) svg,
+.dashboard-icon-action svg {
   width: 16px !important;
   height: 16px !important;
+}
+
+/* The top bar's search and help are Flora's own header utilities, not dashboard
+   chrome: they sit at the 20px asset size the icons ship at. Same reason as
+   above — the class on the icon is dropped in the clone, so the size is set
+   from the button. */
+.flora-header .flora-header-icon-20 svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+/* Garden gives icon-only buttons a circular hover fill. Everywhere they appear
+   here they sit beside square-cornered controls — the copilot button, the tab
+   strip, the widget chrome — so square the hover off to 8px to match: a pill
+   among rectangles reads as a different kind of control. The hover fill follows
+   the border radius, so setting it once covers rest and hover both. */
+[data-garden-id='buttons.icon_button'] {
+  border-radius: 8px !important;
 }
 
 /* "Viewing" and "Editing" are different lengths, so pin the toggle's width to
@@ -358,6 +400,30 @@ html {
 .dashboard-mode-toggle {
   width: 95px !important;
   flex-shrink: 0;
+}
+
+/* Icon-only form of the same toggle, used on narrow headers. It stays a Button
+   rather than an IconButton, so the rule above doesn't reach it: restate the 8px
+   here so a 32px square doesn't resolve its pill radius into a circle, and it
+   reads as a stroked icon button like its neighbours. */
+.dashboard-mode-toggle-compact {
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Garden puts the gap between icon and label on the icon itself, so with the
+   label gone that margin sits the icon 4px off centre. */
+.dashboard-mode-toggle-compact [data-garden-id='buttons.icon'],
+.dashboard-mode-toggle-compact svg {
+  margin: 0 !important;
 }
 
 /* Save (a split button) and Share (a plain button) swap in the same slot, so
@@ -372,6 +438,13 @@ html {
   flex: 1 1 auto;
 }
 
+/* Save is the one pill in the bar — a filled primary reads as the action, not as
+   another piece of chrome — so its chevron cap opts back out of the 8px above
+   and keeps the pill's outer edge, matching the label half's own radius. */
+.dashboard-primary-split-button [data-garden-id='buttons.icon_button'] {
+  border-radius: 0 9999px 9999px 0 !important;
+}
+
 .dashboard-reports-modal-body {
   padding-top: 16px !important;
 }
@@ -384,6 +457,16 @@ html {
   background: #f8f9f9;
 }
 
+/* Four columns of metadata inside a modal is a dense read, so the picker's table
+   steps down to 12px on a 16px line — the same pair the builder's own labels
+   use. The descendant selector is there because each cell's text is a Flora MD,
+   which carries its own 14px. */
+.dashboard-reports-modal-list [data-garden-id^='tables.'],
+.dashboard-reports-modal-list [data-garden-id^='tables.'] span {
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .flora-search-filter [data-garden-id='fields.field'],
 .flora-search-filter [data-garden-id='dropdowns.combobox'],
 .flora-search-filter [data-garden-id='dropdowns.combobox.trigger'] {
@@ -394,6 +477,44 @@ html {
 .flora-split-button [data-garden-id='buttons.icon_button'] svg {
   width: 12px !important;
   height: 12px !important;
+}
+
+/* The rule above is about chevrons, which are small on purpose. The refresh
+   control's leading half is an icon button too — a full-sized glyph, not a
+   chevron — so it takes the header bar's own 16px back. */
+.dashboard-refresh-split-button [data-garden-id='buttons.icon_button'] svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* The refresh control is a stroked rectangle, not a pill, and it wears the same
+   stroke as the Saved views button beside it: 1px of --border on white at an 8px
+   radius, so the two read as one pair of framed controls. Garden's own button
+   border is darker and rounder, hence the overrides. */
+.dashboard-refresh-split-button [data-garden-id='buttons.button'],
+.dashboard-refresh-split-button [data-garden-id='buttons.icon_button'] {
+  border-color: var(--border) !important;
+  background-color: #fff !important;
+}
+
+.dashboard-refresh-split-button [data-garden-id='buttons.button']:hover,
+.dashboard-refresh-split-button [data-garden-id='buttons.icon_button']:hover {
+  background-color: #f8f9f9 !important;
+}
+
+/* The refresh glyph is the left cap and the schedule the right one, so the
+   divider falls immediately after the icon. The two halves overlap by a pixel,
+   which is what collapses their facing borders into that single line — Garden
+   puts the overlap on its icon button, which is now the leading half, so it
+   moves to the trailing one. */
+.dashboard-refresh-split-button [data-garden-id='buttons.icon_button'] {
+  border-radius: 8px 0 0 8px !important;
+  margin-left: 0 !important;
+}
+
+.dashboard-refresh-split-button [data-garden-id='buttons.button'] {
+  border-radius: 0 8px 8px 0 !important;
+  margin-left: -1px !important;
 }
 
 /* Split-button dropdowns size to their tiny chevron trigger, collapsing the
@@ -409,18 +530,54 @@ html {
   white-space: nowrap;
 }
 
+/* The panel sizes to its content rather than to a fixed w-72 that would clip the
+   tab row: at 14px the three tab names come to ~273px with their gaps and side
+   padding, so they sit just inside the floor below. The floor keeps narrow
+   content (short value lists) from collapsing the panel, and a longer tab name
+   grows the panel instead of being cut off. */
+.dashboard-filter-panel {
+  width: max-content !important;
+  min-width: 20rem;
+  max-width: 28rem;
+}
+
+/* The panel's controls read at 12px — search, checkbox, values, links and footer
+   buttons — so no one control looks like a different scale. Its tabs are the one
+   exception, at 14px with every other tab strip in the app (rule below, which
+   outranks this one on specificity): a tab names a whole view, and it reads at
+   one size wherever it appears.
+   Garden sets font-size on the wrappers (tablist, faux_input, item buttons) as
+   well as the label spans, so both levels need overriding. Icons are excluded:
+   they're sized in px by their own rules and shouldn't inherit text metrics. */
+.dashboard-filter-panel,
+.dashboard-filter-panel :not(svg):not(path) {
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
 .dashboard-filter-panel-tabs,
 .dashboard-filter-panel-tabs[data-garden-id='tabs.tablist'] {
   display: flex !important;
   align-items: center;
-  gap: 24px;
+  flex-wrap: nowrap;
+  gap: 16px;
   margin-bottom: 0;
   padding: 0 16px;
   border-bottom: 1px solid #eae9e8;
 }
 
+/* Tab names show in full: they never shrink, wrap, or ellipsize — the panel is
+   sized to hold them instead. */
 .dashboard-filter-panel-tabs [data-garden-id='tabs.tab'],
 .dashboard-filter-panel-tabs > [data-garden-id='tabs.tab'] {
+  flex: 0 0 auto;
+  max-width: none !important;
+  min-width: 0;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
   padding: 12px 0 !important;
   border-top: none !important;
   border-left: none !important;
@@ -444,35 +601,84 @@ html {
   padding: 0 16px;
 }
 
+/* Search + value list are one visual unit, so they stack with no gap between
+   them and the search takes the group's full width. */
+.dashboard-filter-panel-value-group {
+  display: flex;
+  flex-direction: column;
+}
+
 .dashboard-filter-panel-search {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.dashboard-filter-panel-search [data-garden-id='forms.field'],
+.dashboard-filter-panel-search [data-garden-id='fields.field'] {
+  margin: 0;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/* The input is the top half of the joined unit: it spans the group's full width,
+   its bottom corners square off, and the list below drops its own top border so
+   the two share one seam. */
+.dashboard-filter-panel-search [data-garden-id='forms.faux_input'],
+.dashboard-filter-panel-search [data-garden-id='forms.input'] {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* Pushed to the far end of the header row so the bulk-action links stay grouped
+   on the left. */
+.dashboard-filter-panel-search-more {
+  flex: 0 0 auto;
+  margin-left: auto;
+  height: 32px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  padding: 0 !important;
+}
+
+/* Portaled out of the panel, so it needs the panel's 12px type explicitly.
+   Sized to its widest label so no option wraps to two lines. */
+.dashboard-filter-panel-search-menu {
+  width: max-content !important;
+  min-width: 12rem;
+}
+
+.dashboard-filter-panel-search-menu [data-slot='dropdown-menu-checkbox-item'],
+.dashboard-filter-panel-search-menu [data-slot='dropdown-menu-item'],
+.dashboard-filter-panel-search-menu [data-garden-id='typography.font'] {
+  font-size: 12px !important;
+  line-height: 16px !important;
+  white-space: nowrap;
+}
+
+/* Now the panel's first row: Select all / Clear all on the left, search options
+   overflow pushed to the right end. */
+.dashboard-filter-panel-list-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding-top: 16px;
 }
 
-.dashboard-filter-panel-search [data-garden-id='fields.field'] {
-  margin: 0;
-}
-
-.dashboard-filter-panel-scoped [data-garden-id='fields.field'] {
-  margin: 0;
-}
-
-.dashboard-filter-panel-scoped [data-garden-id='forms.checkbox_label'] {
-  font-size: 12px !important;
-  line-height: 16px !important;
-  font-weight: 400 !important;
-}
-
-.dashboard-filter-panel-list-header {
-  padding-top: 4px;
-}
-
+/* Bottom half of the search + list unit: no top border (the input's bottom edge
+   is the seam) and only the bottom corners round. */
 .dashboard-filter-panel-list {
   max-height: 323px;
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid #eae9e8;
-  border-radius: 4px;
-  [scrollbar-gutter: stable];
+  border-top: 0;
+  /* Matches the input's 8px top radius so the joined unit reads as one shape. */
+  border-radius: 0 0 8px 8px;
+  scrollbar-gutter: stable;
 }
 
 .dashboard-filter-panel-empty {
