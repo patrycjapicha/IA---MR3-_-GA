@@ -318,6 +318,48 @@ function FloraColorPicker({ value, onChange, allowTransparent, palette }: { valu
   );
 }
 
+// How long a simulated reload takes. Data first, then the summary: a summary is
+// written from the rows underneath it, so it can't settle before they do, and
+// watching it land second is what says so. Both are long enough to read as work
+// happening and short enough that nobody waits through them twice.
+const RELOAD_DATA_MS = 900;
+const RELOAD_SUMMARY_MS = 1400;
+
+// Covers a widget while the dashboard reloads rather than emptying it: the card
+// keeps its size, so the canvas doesn't reflow as each one lands and the author's
+// eye stays where they left it. Translucent, because the stale figure showing
+// faintly underneath is the honest picture — it is still the last known value
+// until the new one arrives.
+function WidgetReloadOverlay({
+  label = 'Refreshing…',
+  variant = 'data',
+}: {
+  label?: string;
+  variant?: 'data' | 'summary';
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-[250] flex items-center justify-center rounded-[16px] bg-white/70"
+      // Not interactive: a widget mid-reload has nothing to act on yet, and a
+      // click landing on the stale chart underneath would read as a live one.
+      style={{ backdropFilter: 'blur(1px)' }}
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="flex items-center gap-2 rounded-full border border-[#dcdcda] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+        {variant === 'summary' ? (
+          // The summary is being written, not fetched, so it gets the mark that
+          // says so everywhere else in the dashboard rather than a spinner.
+          <Sparkles className="size-[14px] shrink-0 animate-pulse" style={{ width: 14, height: 14, color: '#5b4bc4' }} />
+        ) : (
+          <ArrowRotateRight className="size-[14px] shrink-0 animate-spin text-muted-foreground" style={{ width: 14, height: 14 }} />
+        )}
+        <span className="text-[13px] leading-[18px] text-muted-foreground">{label}</span>
+      </span>
+    </div>
+  );
+}
+
 // Inline contextual style controls (background, drop shadow, border) matching the text
 // component toolbar — used by widgets like Image that show a floating toolbar row.
 function WidgetStyleControls({
@@ -774,6 +816,9 @@ interface ContentItem {
 // lines of metadata under every figure.
 const REPORT_PROVENANCE_DEFAULTS = {
   dataset: 'Support tickets',
+  // A live report doesn't read a stored dataset, it reads the feed — so it names
+  // the feed. This is the one line a real-time report's menu carries.
+  liveDataset: 'Real-time monitoring',
   historicalRefresh: 'Hourly',
   liveRefresh: 'Every 30 seconds',
   lastRefreshed: '10:42 AM',
@@ -791,7 +836,10 @@ function reportProvenance(content: any) {
       ? REPORT_PROVENANCE_DEFAULTS.liveRefresh
       : REPORT_PROVENANCE_DEFAULTS.historicalRefresh);
   return {
-    dataset: c.dataset || REPORT_PROVENANCE_DEFAULTS.dataset,
+    isLive,
+    dataset:
+      c.dataset ||
+      (isLive ? REPORT_PROVENANCE_DEFAULTS.liveDataset : REPORT_PROVENANCE_DEFAULTS.dataset),
     // The cadence belongs to the dataset, so it rides on the same line; the
     // timestamp is about this reading of it, and drops to the next.
     cadence,
@@ -805,8 +853,14 @@ function reportProvenance(content: any) {
 // column in a menu this narrow costs more width than the words are worth. The
 // dataset leads, with the database glyph the library uses for datasets, so the
 // source is identifiable without a "Dataset:" label to carry it.
+//
+// A real-time report keeps the source line and drops the rest: the cadence and a
+// clock time are answers to "is this current?", and on a live feed that question
+// is already answered by the green dot beside the title — a fixed "Updated 10:42
+// AM" under streaming data reads as staleness that isn't there. So the feed's name
+// is the whole footer.
 function ReportProvenanceMenuFooter({ content }: { content: any }) {
-  const { dataset, cadence, updated } = reportProvenance(content);
+  const { isLive, dataset, cadence, updated } = reportProvenance(content);
   return (
     <>
       <div className="border-t border-border my-1" />
@@ -822,22 +876,26 @@ function ReportProvenanceMenuFooter({ content }: { content: any }) {
           {/* The dataset can be long, so it is the part that gives way — the
               cadence beside it is short and fixed. */}
           <span className="min-w-0 truncate text-[#2f3130]" title={dataset}>{dataset}</span>
-          <span aria-hidden className="shrink-0 text-[#c2c8cc]">·</span>
-          {/* The glyph carries "refresh", so the line reads as icon + interval —
-              the word cost more width than it explained. Same rotate icon as the
-              header's refresh-data-now action, so the two read as one idea. */}
-          <span
-            className="flex shrink-0 items-center gap-1"
-            title={`Refreshes ${cadence.toLowerCase()}`}
-          >
-            <ArrowRotateRight
-              className="shrink-0 fill-current !text-[#68737d]"
-              style={{ width: 12, height: 12 }}
-            />
-            {cadence}
-          </span>
+          {!isLive && (
+            <>
+              <span aria-hidden className="shrink-0 text-[#c2c8cc]">·</span>
+              {/* The glyph carries "refresh", so the line reads as icon + interval —
+                  the word cost more width than it explained. Same rotate icon as the
+                  header's refresh-data-now action, so the two read as one idea. */}
+              <span
+                className="flex shrink-0 items-center gap-1"
+                title={`Refreshes ${cadence.toLowerCase()}`}
+              >
+                <ArrowRotateRight
+                  className="shrink-0 fill-current !text-[#68737d]"
+                  style={{ width: 12, height: 12 }}
+                />
+                {cadence}
+              </span>
+            </>
+          )}
         </div>
-        <div>{updated}</div>
+        {!isLive && <div>{updated}</div>}
       </div>
     </>
   );
@@ -1243,10 +1301,12 @@ const TOOLS_ONBOARDING_DELAY_MS = 700;
 // rather than as a new kind of thing. The arrow points down here because the
 // tooltip sits above what it is describing.
 //
-// White on the border and lifted shadow the floating toolbar and the suggestion
-// chip use, rather than the header coachmark's dark ground: this one sits on the
-// canvas's own bottom band with those two, and a card that lifts off the grid the
-// same way they do reads as the chrome pointing at itself.
+// The ground is the header coachmark's #293239 — the same dark the active tab in
+// the top bar carries. Onboarding is the one voice in this UI that speaks over the
+// work rather than being part of it, and the dark card is how it says so: white
+// cards on this band are the toolbar and the suggestion chip, which are chrome the
+// author uses, not a message about it. Sharing the tab's exact dark also keeps the
+// two coachmarks reading as one tour across the header and the canvas.
 function ToolsOnboardingTooltip({ onDismiss }: { onDismiss: () => void }) {
   const [hasEntered, setHasEntered] = useState(false);
   useEffect(() => {
@@ -1258,43 +1318,127 @@ function ToolsOnboardingTooltip({ onDismiss }: { onDismiss: () => void }) {
 
   return (
     <div className={`pointer-events-auto w-[400px] ${CANVAS_BAND_ENTRANCE}`}>
-      <div className="relative rounded-2xl border border-border bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+      <div className="relative rounded-2xl bg-[#293239] p-6 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
         <button
           type="button"
           aria-label="Close onboarding"
           onClick={onDismiss}
-          className="absolute right-2 top-2 flex size-6 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-[#dcdcda]"
+          className="absolute right-2 top-2 flex size-6 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/20"
         >
-          <X className="size-4 text-[#2f3130]" />
+          <X className="size-4 text-white" />
         </button>
 
         {/* pr-6 on the title row alone rather than on the whole block: only that
             row runs under the X, and the row below it needs its full width to keep
             the copy off a third line. */}
-        <p className="mb-2 pr-6 text-base font-semibold leading-[20px] text-[#2f3130]">
-          Your tools are down here.
+        <p className="mb-2 pr-6 text-base font-semibold leading-[20px] text-white">
+          Build and style your dashboard
         </p>
-        {/* Copy and dismiss on one row rather than stacked: the sentence is short
-            enough to leave room beside it, and the shorter card sits closer to the
-            toolbar it is pointing at. */}
-        <div className="flex items-end gap-4">
-          <p className="flex-1 text-base leading-[18px] text-muted-foreground">
-            Add reports, text and images from the toolbar below.
-          </p>
-          <div className="shrink-0">
-            <FloraButton isPill size="small" onClick={onDismiss}>
-              Got it
-            </FloraButton>
-          </div>
+        {/* The body now runs to two sentences, so it takes the card's full width and
+            the dismiss drops below it. Beside the button this copy would break onto
+            four narrow lines — the row layout only held while the message was one
+            short sentence. */}
+        {/* Full white rather than a dimmed second level, the same call the header
+            coachmark makes: the paragraph is the message, not a caption under it,
+            and muted grey on this ground is the one thing that would be hard to
+            read at 14px. */}
+        <p className="text-base leading-[20px] text-white">
+          Use the toolbar below to add reports, text, and images to your canvas. You
+          can also customize your dashboard’s layout and styling.
+        </p>
+        <div className="mt-4 flex justify-end">
+          {/* Flora's default button is transparent with dark ink, which vanishes
+              on this ground — so it is filled white here and takes the card's own
+              dark for its label. It is the only action on the card, so it can
+              afford to be the one solid thing on it. */}
+          <FloraButton
+            isPill
+            size="small"
+            onClick={onDismiss}
+            className="!bg-white !text-[#293239] hover:!bg-[#f0f1f2]"
+          >
+            Got it
+          </FloraButton>
         </div>
 
-        {/* Arrow last so it draws over the card's own bottom border, and centred on
+        {/* Arrow last so it draws over the card's own bottom edge, and centred on
             the tool row rather than on the card: the card is wider than the bar's
-            middle, and an arrow off to one side would point at a single tool. Only
-            the two edges facing the toolbar are stroked — the other two are inside
-            the card. */}
+            middle, and an arrow off to one side would point at a single tool. No
+            stroke now the card has none — on the dark ground the fill alone reads
+            as the card's own corner. */}
         <div
-          className="absolute -bottom-2 left-1/2 size-4 -translate-x-1/2 rotate-45 border-b border-r border-border bg-white"
+          className="absolute -bottom-2 left-1/2 size-4 -translate-x-1/2 rotate-45 bg-[#293239]"
+          aria-hidden
+        />
+      </div>
+    </div>
+  );
+}
+
+// Viewing mode's counterpart to the tools coachmark: the one control in the filter
+// row a viewer would not otherwise find a reason to press. The two are the same
+// card on purpose — one dark voice introducing whichever mode you are in, one thing
+// per mode, never both at once.
+//
+// It hangs below the filter bar instead of above it, so the arrow is on top and
+// pinned left: this points at a single 32px button rather than at a whole row, and
+// a centred arrow would land on the filter chips beside it.
+function SavedViewsOnboardingTooltip({ onDismiss }: { onDismiss: () => void }) {
+  const [hasEntered, setHasEntered] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setHasEntered(true), TOOLS_ONBOARDING_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!hasEntered) return null;
+
+  return (
+    // Drops into place rather than rising: it arrives from the bar it belongs to,
+    // which is above it, where the canvas-band chrome arrives from below.
+    <div className="pointer-events-auto w-[360px] animate-in fade-in slide-in-from-top-3 duration-300 ease-out fill-mode-both">
+      <div className="relative rounded-2xl bg-[#293239] p-6 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
+        <button
+          type="button"
+          aria-label="Close onboarding"
+          onClick={onDismiss}
+          className="absolute right-2 top-2 flex size-6 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-white/20"
+        >
+          <X className="size-4 text-white" />
+        </button>
+
+        <p className="mb-2 pr-6 text-base font-semibold leading-[20px] text-white">
+          Save your dashboard view
+        </p>
+        <p className="text-base leading-[20px] text-white">
+          Save the current filter configuration as a view to quickly return to it
+          later.
+        </p>
+        <div className="mt-4 flex justify-end">
+          <FloraButton
+            isPill
+            size="small"
+            onClick={onDismiss}
+            className="!bg-white !text-[#293239] hover:!bg-[#f0f1f2]"
+          >
+            Got it
+          </FloraButton>
+        </div>
+
+        {/* Left rather than centred, on the bookmark button's own column — 29px in
+            from the card's edge, which is where that button's centre falls given
+            the card's own offset.
+
+            12px rather than 16, and its base has to clear the card's corner
+            radius: a rotated square is √2 as wide as its side, so a 16px one
+            reached back into the curve, where there is no straight edge for it to
+            sit on — it read as a spike stuck to the corner rather than as the
+            card's own point. At 12px the base spans 22→36px, clear of the 14px
+            radius and on the flat top edge. The top offset is half the rotated
+            height, putting the square's centre on that edge: the half below it
+            overlaps the card in the card's own colour, so there is no seam to
+            show. */}
+        <div
+          className="absolute -top-[5px] left-[29px] size-3 -translate-x-1/2 rotate-45 bg-[#293239]"
           aria-hidden
         />
       </div>
@@ -1770,6 +1914,11 @@ const ST_BAND_TEXT_X = libX(0) - ST_TEXT_PAD;
 // Charts and the two ranked tables all read comfortably at one height, so every
 // band runs the same depth and the page keeps a single horizontal rhythm.
 const ST_ROW_H = 340;
+// The exception, and it earns it: the live band is one series across the full 12
+// columns, so at 340px it would be a field of empty chart. Shallow and wide also
+// keeps it from reading as the first of the analytical rows below it — it is a
+// status strip, not a figure to study.
+const ST_LIVE_ROW_H = 220;
 // Between blocks inside the lead panel — the description and the AI summary.
 const ST_BAND_GAP = 32;
 // A band heading sits in an equal measure of space: the same air above the words
@@ -1836,7 +1985,7 @@ function createStTabItems({
   description: string;
   lastQuarterLink?: boolean;
   aiSummary?: boolean;
-  bands: Array<{ key: string; title: string; reports: StReport[] }>;
+  bands: Array<{ key: string; title: string; reports: StReport[]; rowHeight?: number }>;
 }): ContentItem[] {
   const items: ContentItem[] = [];
   let y = LIB_M;
@@ -1968,14 +2117,17 @@ function createStTabItems({
       })
     );
     y += ST_HEADING_H;
+    // One height for the whole band, so its cards sit on a common baseline; a band
+    // states its own only where the shape of its content asks for it.
+    const rowH = b.rowHeight ?? ST_ROW_H;
     let col = 0;
     b.reports.forEach((r) => {
       items.push(
-        libChart(r.id, r.title, { x: libX(col), y, w: libSpan(r.span), h: ST_ROW_H }, r.content, ST_CARD)
+        libChart(r.id, r.title, { x: libX(col), y, w: libSpan(r.span), h: rowH }, r.content, ST_CARD)
       );
       col += r.span;
     });
-    y += ST_ROW_H;
+    y += rowH;
   });
 
   // A tab ends on its last band. The links that used to close the dashboard are
@@ -1983,6 +2135,47 @@ function createStTabItems({
   // tab's description, where a reader is oriented rather than on their way out.
   return items;
 }
+
+// ---- Right now ----------------------------------------------------------
+// The tab's one live report, and the reason it leads: a reader opening this
+// dashboard mid-shift wants to know what is happening now before they read what
+// happened over the period. Everything below this band is the period; this band is
+// the minute they are in, so it sits above the historical rows rather than after
+// them, where a live figure would read as an afterthought.
+//
+// One report, full width. A second live figure would turn a status strip into
+// another band to study, which is what the rows below are for.
+const ST_LIVE_BAND = {
+  key: 'live',
+  title: 'Right now',
+  rowHeight: ST_LIVE_ROW_H,
+  reports: [
+    {
+      id: 'st-live-queue',
+      title: 'Tickets waiting now',
+      span: 12,
+      content: {
+        chartType: 'so-live-queue',
+        reportSource: 'Real-time Monitoring',
+        reportType: 'Operations',
+        // No dataset stated: a live report is fed by the monitoring stream rather
+        // than a stored dataset, and liveData already makes its menu name that
+        // stream. Naming a warehouse table here would contradict it.
+        description:
+          'Tickets still waiting for a first reply, sampled every five minutes over the last hour.',
+        // The one flag that makes this a live report rather than another period
+        // read: it draws the live mark beside the title, names the feed in the
+        // report's menu, and drops the historical cadence and timestamp from it.
+        liveData: true,
+        lastRefreshed: '10:42 AM',
+        // The y-axis doesn't start at zero, which is a choice a reader is entitled
+        // to know about — the shape of the hour depends on it.
+        infoNote:
+          'The queue never empties, so the axis starts at 100 rather than 0 to keep the hour’s movement visible.',
+      },
+    },
+  ],
+};
 
 // ---- Demand -------------------------------------------------------------
 // What arrived, and what it was about: the wide trend first, then the
@@ -2151,7 +2344,7 @@ function createDefaultDashboardTabs(): DashboardTab[] {
           'Inbound ticket volume, the reasons behind it, and how quickly tickets were answered and resolved.',
         lastQuarterLink: true,
         aiSummary: true,
-        bands: [ST_DEMAND_BAND, ST_SPEED_BAND],
+        bands: [ST_LIVE_BAND, ST_DEMAND_BAND, ST_SPEED_BAND],
       }),
     },
     {
@@ -3034,7 +3227,12 @@ const filterOptions = [
   {
     id: 'region',
     label: 'Region',
-    values: ['All Regions', 'North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East'],
+    // EMEA and APAC sit alongside the single regions they group, because that is
+    // how support orgs are actually structured — one team covers the whole patch,
+    // and a regional weekly review filters by the team's patch, not by a
+    // continent. Each acronym leads the regions it covers, so the list reads as
+    // territory then parts rather than as one flat set of unrelated names.
+    values: ['All Regions', 'North America', 'EMEA', 'Europe', 'Middle East', 'APAC', 'Asia Pacific', 'Latin America'],
   },
   {
     id: 'channel',
@@ -3181,14 +3379,20 @@ type SavedView = {
   showEventFilter?: boolean;
 };
 
-// The filter row every dashboard opens with: a Last 30 days date range, plus the
-// cross filter chip. This is what Reset returns the row to, and what the row is
+// The filter row every dashboard opens with: a Last 30 days date range, and
+// nothing else. This is what Reset returns the row to, and what the row is
 // compared against to decide whether there is anything to reset — so the two can't
 // disagree about what "default" means.
 const DEFAULT_FILTERS: ActiveFilter[] = [
   { id: 'filter-default-date-range', label: 'Date Range', value: 'Last 30 days', typeId: 'date-range' },
 ];
-const DEFAULT_SHOW_EVENT_FILTER = true;
+// Off. A cross filter is something a reader creates by clicking into a figure, so
+// a dashboard that opens with one already applied is showing a slice nobody asked
+// for — and "Deal created / In admin" named a slice that has nothing to do with
+// the support data on this dashboard. The chip itself is kept: it is still what a
+// real cross filter would draw, and saved views still carry it, so a view that
+// captures one restores it.
+const DEFAULT_SHOW_EVENT_FILTER = false;
 
 // Changed rather than merely present: a filter added or removed, a value picked
 // that isn't the one it opened with, or the cross filter chip dismissed. Matched
@@ -4522,6 +4726,9 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   const [editingTabName, setEditingTabName] = useState<string>('');
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null);
+  // The surface's scroll parent. Widgets are absolutely positioned on the surface,
+  // which is sized to the viewport — it's the parent that scrolls them.
+  const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   // An explicit point to place a widget at, rather than the next slot in the
   // flow: the click point plus the canvas size measured at that moment, which is
   // what a placed widget is clamped to. Nothing supplies one now that a canvas
@@ -4643,14 +4850,22 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   // Dismissing the canvas tip is sticky for the session — it shouldn't come back
   // every time the user toggles out of and back into edit mode.
   const [tipDismissed, setTipDismissed] = useState(false);
-  // The tools coachmark is for the moment a dashboard is created: a blank canvas
-  // the author has just made, not one opened from the library (which arrives with
-  // content, in view mode) and not the tab the prototype boots with. Closing it is
-  // sticky for the session the same way the tip is — it is a one-time introduction,
-  // so toggling back into edit mode must not bring it back.
-  const [toolsOnboardingDismissed, setToolsOnboardingDismissed] = useState(
-    shouldPrepopulate || isDefaultDashboard,
-  );
+  // The tools coachmark is for the moment an author first has tools to use, which
+  // is either of the two ways into edit mode: a blank dashboard they just created
+  // and so opens in edit mode, or switching a populated one from viewing to
+  // editing. Both are the first time the tool row appears, and where it went is
+  // the one thing worth saying. Not gated on how the dashboard arrived — the
+  // author of an existing dashboard needs telling as much as the author of a new
+  // one, and view mode never shows the row.
+  //
+  // Closing it is sticky for the session the same way the tip is — it is a
+  // one-time introduction, so toggling out of edit mode and back must not bring
+  // it back.
+  const [toolsOnboardingDismissed, setToolsOnboardingDismissed] = useState(false);
+  // The same one-time-per-session introduction for viewing mode's saved views
+  // control. Sticky for the same reason: switching modes is not a request to be
+  // told again.
+  const [savedViewsOnboardingDismissed, setSavedViewsOnboardingDismissed] = useState(false);
   // Discarding throws away unsaved edits, so it asks first.
   const [showDiscardModal, setShowDiscardModal] = useState(false);
 
@@ -4838,6 +5053,61 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
   const contentItems = activeTab?.contentItems || [];
+
+  // Widgets flow on from the last one and wrap down the canvas, so once a
+  // dashboard fills the viewport the next thing added lands below the fold: the
+  // author clicks Report and nothing appears to happen. Follow whatever was just
+  // added into view.
+  //
+  // Watching the item list rather than each add path means every route in behaves
+  // the same — the floating toolbar, the report modal, a suggestion chip — and a
+  // new one added later gets this for free. Two cases look like an add but
+  // aren't: the first render of a dashboard that opens with content, and a tab
+  // switch, which swaps the whole list. Both only reset the baseline.
+  const seenCanvasItemsRef = useRef<{ tabId: string; ids: Set<string> } | null>(null);
+
+  useEffect(() => {
+    const previous = seenCanvasItemsRef.current;
+    seenCanvasItemsRef.current = {
+      tabId: activeTabId,
+      ids: new Set(contentItems.map(item => item.id)),
+    };
+    if (!previous || previous.tabId !== activeTabId) return;
+
+    const added = contentItems.filter(item => !previous.ids.has(item.id));
+    if (added.length === 0) return;
+
+    const scroller = canvasScrollRef.current;
+    if (!scroller) return;
+
+    // Two adds can land in one render pass — the suggestion chips sit side by
+    // side — so aim at the lowest of them rather than the last in the list.
+    const lowest = added.reduce(
+      (furthest, item) => Math.max(furthest, item.position.y + item.size.height),
+      0
+    );
+    const highest = added.reduce(
+      (nearest, item) => Math.min(nearest, item.position.y),
+      Infinity
+    );
+    const viewportBottom = scroller.scrollTop + scroller.clientHeight;
+
+    // Only move if the widget isn't already fully in view: an add that lands on
+    // screen shouldn't shift the canvas under the author. CANVAS_WIDGET_PADDING
+    // is the gap the flow already leaves between widgets, so scrolling to it
+    // leaves the same margin below the new one that it has from its neighbours.
+    if (lowest + CANVAS_WIDGET_PADDING > viewportBottom) {
+      scroller.scrollTo({
+        top: lowest + CANVAS_WIDGET_PADDING - scroller.clientHeight,
+        behavior: 'smooth',
+      });
+    } else if (highest - CANVAS_WIDGET_PADDING < scroller.scrollTop) {
+      scroller.scrollTo({
+        top: Math.max(0, highest - CANVAS_WIDGET_PADDING),
+        behavior: 'smooth',
+      });
+    }
+  }, [contentItems, activeTabId]);
   // Resolved from the current tab's items, so the drawer closes on its own if the
   // summary it was editing is deleted or the author switches tabs.
   const aiSummarySettingsItem =
@@ -4858,6 +5128,18 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   // write back into this list, and a view that didn't turn up in the menu after
   // being saved would read as the save having failed.
   const [savedFilteredViews, setSavedFilteredViews] = useState<SavedView[]>([
+    // A regional manager's Monday-morning row: the week just gone, their region
+    // only. Both chips are spelled out rather than leaning on the dashboard's
+    // default date range — applying a view replaces the whole row, so a view that
+    // named only the region would silently widen the window back to 30 days.
+    {
+      id: 'view-emea-weekly',
+      name: 'EMEA weekly review',
+      filters: [
+        { id: 'f-emea-date', label: 'Date Range', value: 'Last 7 days', typeId: 'date-range' },
+        { id: 'f-emea-region', label: 'Region', value: 'EMEA', typeId: 'region' },
+      ],
+    },
     { id: 'view-1', name: 'Q4 2024 Performance', filters: [{ id: 'f1', label: 'Time Period', value: 'Q4 2024', typeId: 'timeframe' }] },
     { id: 'view-2', name: 'North America Region', filters: [{ id: 'f2', label: 'Region', value: 'North America', typeId: 'region' }] },
     { id: 'view-3', name: 'Enterprise Customers', filters: [{ id: 'f3', label: 'Customer Segment', value: 'Enterprise', typeId: 'segment' }] },
@@ -5402,12 +5684,73 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   // Back to the row the dashboard opened with, not to no filters at all: an empty
   // row is its own change from the default, and clearing to it would leave the
   // button on screen with nothing left for it to do.
+  //
+  // It drops the applied saved view with it. A view is a name for a particular
+  // row, so once the row is back to the default the name no longer describes what
+  // is on screen — leaving "EMEA weekly review" in the control over default
+  // filters would misname the thing a viewer is reading. Reset is the way back to
+  // the unfiltered, unnamed dashboard, so it clears both halves of where you were.
   const handleResetFilters = () => {
     setActiveFilters(DEFAULT_FILTERS);
     setShowEventFilter(DEFAULT_SHOW_EVENT_FILTER);
-    if (activeBookmarkId) {
-      setIsBookmarkModified(true);
+    setActiveBookmarkId(null);
+    setIsBookmarkModified(false);
+  };
+
+  // Reloading in two stages: 'data' while the reports refetch, then 'summary'
+  // while the AI summary is rewritten from what came back. One value rather than
+  // two booleans, because the stages are sequential — nothing is ever in both.
+  type ReloadPhase = 'idle' | 'data' | 'summary';
+  const [reloadPhase, setReloadPhase] = useState<ReloadPhase>('idle');
+  const reloadTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const isReloading = reloadPhase !== 'idle';
+
+  useEffect(() => () => reloadTimersRef.current.forEach(clearTimeout), []);
+
+  // Dates every AI summary to now, across all tabs: the whole dashboard reloaded,
+  // not just the tab that happened to be open.
+  const stampSummariesRefreshed = () => {
+    setTabs(prevTabs =>
+      prevTabs.map(tab => ({
+        ...tab,
+        contentItems: tab.contentItems.map(item =>
+          isAiSummaryChart(item.content?.chartType)
+            ? {
+                ...item,
+                content: {
+                  ...item.content,
+                  freshness: { dataRefreshed: 'just now', summaryUpdated: 'just now' },
+                },
+              }
+            : item
+        ),
+      }))
+    );
+  };
+
+  // Applying a view changes what every widget is reading, so the dashboard has to
+  // go and read it again. Without that the filter row changes and nothing else
+  // does, which reads as the view not having applied — the numbers look like they
+  // were already the answer.
+  const simulateDashboardReload = () => {
+    if (reloadTimersRef.current.length) {
+      // A second view applied mid-reload restarts the run rather than racing the
+      // first one's timers to 'idle'.
+      reloadTimersRef.current.forEach(clearTimeout);
+      reloadTimersRef.current = [];
     }
+    setReloadPhase('data');
+    reloadTimersRef.current = [
+      setTimeout(() => setReloadPhase('summary'), RELOAD_DATA_MS),
+      setTimeout(() => {
+        setReloadPhase('idle');
+        reloadTimersRef.current = [];
+        // The summary's own footnote is how a reader dates it, so it has to move
+        // when the summary is rewritten — a fresh summary still claiming it read
+        // hour-old data is the one part of this that would be a lie.
+        stampSummariesRefreshed();
+      }, RELOAD_DATA_MS + RELOAD_SUMMARY_MS),
+    ];
   };
 
   const handleApplySavedView = (viewId: string) => {
@@ -5417,6 +5760,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       setShowEventFilter(view.showEventFilter ?? DEFAULT_SHOW_EVENT_FILTER);
       setActiveBookmarkId(viewId);
       setIsBookmarkModified(false);
+      simulateDashboardReload();
     }
   };
 
@@ -5516,8 +5860,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       }
     };
 
+    // Added, not selected. A report's contextual toolbar carries the whole
+    // cross-filtering panel, which is tall enough to cover the report it belongs
+    // to — so opening it on add hides the thing the author just asked for. The
+    // toolbar is a response to clicking a report, and nothing here is a click.
     setContentItems([...contentItems, newItem]);
-    setSelectedItemId(newItem.id);
   };
 
   const handleChartSelect = (chartType: string) => {
@@ -5546,11 +5893,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     // Functional update: the chips sit side by side, so two clicks can land in
     // one render pass — reading `contentItems` directly would drop the first
     // report and position the second on top of it.
+    // Left unselected for the same reason as a report added through the modal:
+    // the toolbar belongs to a click on the report, not to its arrival.
     setContentItems((prev) => [
       ...prev,
       { ...suggestion.report, id, position: getNextPosition(suggestion.report.size, prev) },
     ]);
-    setSelectedItemId(id);
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -5961,7 +6309,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       aria-label="Refresh real-time data now"
                       className="dashboard-icon-action"
                     >
-                      <ArrowRotateRight className={FLORA_BAR_ICON} style={FLORA_BAR_ICON_SIZE} />
+                      {/* Spins through a reload however it was started, so the
+                          control that means "refresh" also reports one. */}
+                      <ArrowRotateRight
+                        className={`${FLORA_BAR_ICON} ${isReloading ? 'animate-spin' : ''}`}
+                        style={FLORA_BAR_ICON_SIZE}
+                      />
                     </IconButton>
                   </FloraTooltip>
                   <Menu
@@ -6282,7 +6635,25 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         </div>
 
         {/* Filter Bar - Always visible */}
-        <div className="border-b border-border bg-white px-6 py-2">
+        {/* relative so the saved views coachmark can hang off the bar's own bottom
+            edge; z-30 puts the bar (and so the card) over the tab strip and canvas
+            below it, which the card overlaps by design. */}
+        <div className="relative z-30 border-b border-border bg-white px-6 py-2">
+          {/* Viewing mode's coachmark, below the bar and on the bookmark button's
+              own gutter. Absolute against the bar rather than in the row, so a
+              360px card can't wrap the filter chips onto a second line.
+              Held 8px from the shell's edge rather than on the bar's own gutter, so
+              the bookmark button's centre falls 29px into the card — past the
+              rounded corner, which is the only place an arrow can meet a straight
+              edge. Stated in px because the 14px root under-resolves rem, and this
+              offset has to line up with a button measured in px. */}
+          {!isEditing && !savedViewsOnboardingDismissed && (
+            <div className="absolute left-[8px] top-full z-[140] pt-2">
+              <SavedViewsOnboardingTooltip
+                onDismiss={() => setSavedViewsOnboardingDismissed(true)}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2">
            <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
             {savedViewsControl}
@@ -6350,8 +6721,10 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 rather than holding the right edge, so it stays next to the
                 filters it clears however many rows they take — and it only
                 appears once the row differs from the default it opened with, so
-                it isn't offering to undo something nobody did. */}
-            {!isEditing && !isFilterStateDefault && (
+                it isn't offering to undo something nobody did — or once a saved
+                view is applied, since reset drops that too and a view whose
+                filters happen to match the default is still something to leave. */}
+            {!isEditing && (!isFilterStateDefault || activeBookmarkId) && (
               <FloraTooltip content="Reset filters" placement="bottom" size="small">
                 <Button
                   variant="ghost"
@@ -6421,7 +6794,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
         {/* Canvas Area. The scroll container is nested inside a static wrapper so
             the floating tip stays pinned to the corner as the canvas scrolls. */}
         <div className="relative flex-1 min-h-0">
-          <div className="h-full overflow-auto" style={{ backgroundColor: CANVAS_BG }}>
+          <div ref={canvasScrollRef} className="h-full overflow-auto" style={{ backgroundColor: CANVAS_BG }}>
           <div
             ref={canvasSurfaceRef}
             // Default cursor in both modes: the canvas isn't a place things get
@@ -7258,6 +7631,14 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               // is no card edge to do that work for it.
               const isSectionWidget = item.type !== 'image' && wBg === 'transparent' && !wBorder;
               const isWidgetSelected = isEditing && selectedItemId === item.id;
+              // What reloads, and for how long. A report is done once its rows are
+              // back; a summary is written from those rows, so it stays busy
+              // through both stages and settles last. Text, images, separators and
+              // parameters hold no data — nothing to refetch, so they don't flicker.
+              const isAiSummaryWidget = isAiSummaryChart(item.content?.chartType);
+              const widgetReloading =
+                isReloading &&
+                (isAiSummaryWidget ? true : item.type === 'chart' && reloadPhase === 'data');
               return (
               <div
                 key={item.id}
@@ -7272,6 +7653,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 }}
                 onClick={(e) => { e.stopPropagation(); if (isEditing) setSelectedItemId(item.id); }}
               >
+                {widgetReloading && (
+                  <WidgetReloadOverlay
+                    variant={isAiSummaryWidget ? 'summary' : 'data'}
+                    label={isAiSummaryWidget ? 'Rewriting summary…' : 'Refreshing…'}
+                  />
+                )}
                 {isEditing && isWidgetSelected && (
                   <ResizeHandles onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
                 )}
@@ -7353,9 +7740,51 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     }`}
                   >
                     <div className="flex min-w-0 flex-1 items-start gap-2 pl-3 pt-3">
-                      {/* Live data indicator */}
+                      {/* Live data indicator. The dot is a mark, not a control, so
+                          the words it stands for live in a tooltip — and it needs
+                          them: a green dot beside a report title could as easily be
+                          read as a health state. `-mx-1 p-1` gives the 8px dot a
+                          16px hover target without moving it: the padding pushes it
+                          in, the negative margin pulls the box back out, so the
+                          title's own gap is unchanged.
+
+                          The mark tracks the dashboard's refresh state, because a
+                          live report is only as live as the schedule feeding it:
+                          with refresh paused the figure is a frozen sample, and a
+                          green dot over it would be a lie. So the dot gives way to
+                          a pause glyph in the same slot — the report is still the
+                          real-time one, which is exactly why the stall is worth
+                          marking. The dot itself is deliberately still: it marks a
+                          standing property of the report, not an event, and a
+                          pulse on every live title would pull the eye off the
+                          numbers it sits beside. */}
                       {item.content?.liveData && (
-                        <div className="mt-1 w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></div>
+                        <FloraTooltip
+                          content={isAutoRefreshing ? 'Real-time data' : 'Real-time data — refresh paused'}
+                          placement="bottom-start"
+                          size="small"
+                        >
+                          <span
+                            className="-mx-1 flex shrink-0 cursor-help p-1"
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={isAutoRefreshing ? 'Real-time data' : 'Real-time data, refresh paused'}
+                          >
+                            {isAutoRefreshing ? (
+                              <span className="size-2 shrink-0 rounded-full bg-green-500" aria-hidden />
+                            ) : (
+                              // The filled cut at this size, for the reason the
+                              // import notes: the stroke cut's two bars close into a
+                              // smudge below ~16px. Grey, not green — paused is the
+                              // absence of the live state, so it drops out of the
+                              // live colour rather than restating it in another.
+                              <PauseFill
+                                className="shrink-0 text-[#6b7280]"
+                                style={{ width: 12, height: 12 }}
+                                aria-hidden
+                              />
+                            )}
+                          </span>
+                        </FloraTooltip>
                       )}
                       {item.type !== 'image' && (
                         <FloraTooltip

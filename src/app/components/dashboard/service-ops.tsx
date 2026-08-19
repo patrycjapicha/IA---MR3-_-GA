@@ -167,6 +167,27 @@ export const topIssuesData = [
   { issue: 'Mobile push not delivered', volume: 214, change: -22, csat: 93.5, driver: 'Product defect' },
 ];
 
+// The one live series in this file: tickets waiting for a first reply, sampled
+// every five minutes over the last hour. Every other dataset here is a period
+// read in weeks — this one is the minute the reader is in, which is why it is
+// labelled in minutes ago rather than in clock time. A fixed clock would go stale
+// against the "Updated 10:42 AM" the report's own provenance line carries.
+export const liveQueueData = [
+  { at: '60m', waiting: 112 },
+  { at: '55m', waiting: 118 },
+  { at: '50m', waiting: 109 },
+  { at: '45m', waiting: 121 },
+  { at: '40m', waiting: 127 },
+  { at: '35m', waiting: 119 },
+  { at: '30m', waiting: 136 },
+  { at: '25m', waiting: 141 },
+  { at: '20m', waiting: 133 },
+  { at: '15m', waiting: 145 },
+  { at: '10m', waiting: 152 },
+  { at: '5m', waiting: 147 },
+  { at: 'now', waiting: 148 },
+];
+
 export const teamAttentionData = [
   { team: 'Escalations', sla: 78, backlog: 214, occupancy: 96, state: 'critical' as const },
   { team: 'Tier 2 — Technical', sla: 85, backlog: 168, occupancy: 91, state: 'warning' as const },
@@ -394,6 +415,94 @@ function ContactReasonDonut() {
             <span className="tabular-nums" style={{ color: INK }}>{s.value}%</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// The live queue, as a strip rather than a card: one series over one hour, so it
+// is wide and shallow instead of square. The level a reader acts on is the current
+// one, so that number is stated at 32px beside the chart and the line behind it
+// only has to say how it got there.
+//
+// Area rather than line: a backlog is a quantity standing in a queue, and the fill
+// reads as depth. Single hue, since there is one series and nothing to tell apart.
+//
+// It carries no green dot of its own — the builder draws that beside the title from
+// the report's `liveData` flag, so every live report in the product is marked in
+// one place and this renderer stays about the figure.
+function LiveQueueChart() {
+  const current = liveQueueData[liveQueueData.length - 1].waiting;
+  // Half an hour back rather than the previous sample: five minutes of queue
+  // movement is noise, and a delta a reader can't act on is worse than none.
+  const halfHourAgo = liveQueueData[liveQueueData.length - 7].waiting;
+  return (
+    <div className="flex h-full gap-4 px-2 pb-1">
+      {/* Fixed rather than proportional: the number and its two lines of context
+          need the same room whatever the card is stretched to, and everything
+          beyond that belongs to the hour of data. */}
+      <div className="flex w-[164px] shrink-0 flex-col justify-center pl-2">
+        <div className="text-[32px] font-medium leading-none" style={{ color: INK }}>
+          {current}
+        </div>
+        <div className="mt-1.5 text-sm" style={{ color: MUTED }}>
+          waiting for a first reply
+        </div>
+        <div className="mt-2.5 flex items-center gap-1.5">
+          {/* A growing queue is the bad direction, so the delta is inverted. */}
+          <Delta value={current - halfHourAgo} suffix="" invert />
+          <span className="text-sm" style={{ color: MUTED }}>vs 30 min ago</span>
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={liveQueueData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="live-queue-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={SERIES.blue} stopOpacity={0.26} />
+                  <stop offset="100%" stopColor={SERIES.blue} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={GRID} vertical={false} />
+              <XAxis dataKey="at" axisLine={{ stroke: AXIS }} tickLine={false} tick={AXIS_TICK} />
+              {/* Not anchored at zero: the queue never empties, so a zero floor
+                  would flatten an hour of movement a reader is watching for. The
+                  band is the hour's own range rounded out to round ticks, which is
+                  as tight as it can go without cropping a sample. */}
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={AXIS_TICK}
+                width={44}
+                domain={[100, 160]}
+                ticks={[100, 120, 140, 160]}
+              />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                labelFormatter={(l: any) => (l === 'now' ? 'Now' : `${l} ago`)}
+                formatter={(v: any) => [`${v} waiting`, '']}
+              />
+              <Area
+                type="monotone"
+                dataKey="waiting"
+                name="Waiting"
+                stroke={SERIES.blue}
+                strokeWidth={2}
+                fill="url(#live-queue-fill)"
+                dot={false}
+                // The newest reading is the one the card is about, so it is the
+                // only point marked.
+                activeDot={{ r: 5, stroke: '#ffffff', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <Interpretation>
+          Arrivals have outpaced replies for the last half hour — the queue is up{' '}
+          {current - halfHourAgo} tickets since then, after holding near 120 earlier in the hour.
+        </Interpretation>
       </div>
     </div>
   );
@@ -707,6 +816,7 @@ function ActionList({ content }: { content: any }) {
 const RENDERERS: Record<string, (content: any) => React.ReactNode> = {
   'so-kpi': (content) => <KpiTile content={content} />,
   'so-narrative': (content) => <NarrativeCard content={content} />,
+  'so-live-queue': () => <LiveQueueChart />,
   'so-stacked-bar': () => <StackedChannelChart />,
   'so-donut': () => <ContactReasonDonut />,
   'so-responsiveness': () => <ResponsivenessChart />,
