@@ -5168,42 +5168,6 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     return () => clearInterval(interval);
   }, [isAutoRefreshing, activeTabId, refreshLiveData]);
 
-  // Simulate data updates when filters are applied
-  useEffect(() => {
-    // Skip on initial mount with default filters
-    if (isFilterStateDefault) return;
-
-    setTabs((prevTabs) =>
-      prevTabs.map((tab) => {
-        if (tab.id !== activeTabId) return tab;
-
-        return {
-          ...tab,
-          contentItems: tab.contentItems.map((item) => {
-            // Update all report types
-            if (item.type !== 'report' && item.type !== 'kpi' && item.type !== 'table') return item;
-
-            // Update the lastRefreshed timestamp
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            });
-
-            return {
-              ...item,
-              content: {
-                ...item.content,
-                lastRefreshed: item.content?.liveData ? timeString : item.content?.lastRefreshed,
-              },
-            };
-          }),
-        };
-      })
-    );
-  }, [activeFilters, activeTabId, isFilterStateDefault, setTabs]);
-
   // Resolved from the current tab's items, so the drawer closes on its own if the
   // summary it was editing is deleted or the author switches tabs.
   const aiSummarySettingsItem =
@@ -5848,6 +5812,50 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       }, RELOAD_DATA_MS + RELOAD_SUMMARY_MS),
     ];
   };
+
+  // Simulate data updates when filters are applied
+  useEffect(() => {
+    // Skip on initial mount with default filters
+    if (isFilterStateDefault) return;
+
+    // Trigger the reload animation
+    simulateDashboardReload();
+
+    // Update timestamps after reload completes
+    const updateTimer = setTimeout(() => {
+      setTabs((prevTabs) =>
+        prevTabs.map((tab) => {
+          if (tab.id !== activeTabId) return tab;
+
+          return {
+            ...tab,
+            contentItems: tab.contentItems.map((item) => {
+              // Update all chart and report types (skip non-data items like text, image, separator)
+              if (item.type !== 'chart' && item.type !== 'report' && item.type !== 'kpi' && item.type !== 'table') return item;
+
+              // Update the lastRefreshed timestamp
+              const now = new Date();
+              const timeString = now.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              });
+
+              return {
+                ...item,
+                content: {
+                  ...item.content,
+                  lastRefreshed: timeString,
+                },
+              };
+            }),
+          };
+        })
+      );
+    }, RELOAD_DATA_MS);
+
+    return () => clearTimeout(updateTimer);
+  }, [activeFilters, activeTabId, isFilterStateDefault, simulateDashboardReload, setTabs]);
 
   const handleApplySavedView = (viewId: string) => {
     const view = savedFilteredViews.find(v => v.id === viewId);
