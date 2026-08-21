@@ -7768,10 +7768,10 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               // is no card edge to do that work for it.
               const isSectionWidget = item.type !== 'image' && wBg === 'transparent' && !wBorder;
               const isWidgetSelected = isEditing && selectedItemId === item.id;
-              // What reloads: charts and reports refetch their data. Text, images,
-              // separators and parameters hold no data — nothing to refetch, so they
-              // don't flicker.
-              const widgetReloading = isReloading && item.type === 'chart';
+              // What reloads: charts with data content refetch their data. Text, images,
+              // separators, sections and parameters hold no data — nothing to refetch,
+              // so they don't flicker.
+              const widgetReloading = isReloading && item.type === 'chart' && item.content?.chartType;
               return (
               <div
                 key={item.id}
