@@ -2159,7 +2159,7 @@ const ST_LIVE_BAND = {
   reports: [
     {
       id: 'st-live-queue',
-      title: 'Tickets waiting now',
+      title: 'Ticket backlog',
       span: 12,
       content: {
         chartType: 'so-live-queue',
