@@ -77,7 +77,7 @@ function TruncatedTabTitle({ title, className }: { title: string; className?: st
   if (!isTruncated) return label;
 
   return (
-    <FloraTooltip content={title} placement="bottom" size="small">
+    <FloraTooltip content={title} placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
       <span className="flex min-w-0">{label}</span>
     </FloraTooltip>
   );
@@ -355,9 +355,6 @@ Automate this action with a trigger to reduce manual triage and help improve res
     if (changes.type !== 'menuItem:click' || !changes.value) return;
 
     switch (changes.value) {
-      case 'report':
-        onCreateReport?.();
-        break;
       case 'dashboard':
         onCreateDashboard?.();
         break;
@@ -471,20 +468,22 @@ Automate this action with a trigger to reduce manual triage and help improve res
                     className={tab.isActive ? '!text-white' : '!text-foreground'}
                   />
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseTab?.(tab.id);
-                  }}
-                  className={`p-0.5 rounded-sm transition-colors ${
-                    tab.isActive
-                      ? 'hover:bg-white/20 text-white/70 hover:text-white'
-                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
+                <FloraTooltip content="Close" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCloseTab?.(tab.id);
+                    }}
+                    className={`p-0.5 rounded-sm transition-colors ${
+                      tab.isActive
+                        ? 'hover:bg-white/20 text-white/70 hover:text-white'
+                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </FloraTooltip>
               </div>
             ))}
           </div>
@@ -533,6 +532,7 @@ Automate this action with a trigger to reduce manual triage and help improve res
               <Item
                 value="dataset"
                 icon={<DatabaseStroke className={FLORA_MENU_ICON} />}
+                disabled
               >
                 Dataset
                 <Item.Meta>Create, combine, clean, and prepare datasets for analysis.</Item.Meta>
@@ -540,6 +540,7 @@ Automate this action with a trigger to reduce manual triage and help improve res
               <Item
                 value="filter-set"
                 icon={<FilterStroke className={FLORA_MENU_ICON} />}
+                disabled
               >
                 Filter set
                 <Item.Meta>Create set of reusable filter values to share across reports and dashboards.</Item.Meta>
@@ -565,14 +566,16 @@ Automate this action with a trigger to reduce manual triage and help improve res
             }}
           />
         ) : (
-          <IconButton
-            size="small"
-            className="flora-header-icon-20"
-            onClick={() => setIsSearchOpen(true)}
-            aria-label="Search analytics"
-          >
-            <Search className={FLORA_HEADER_ICON} />
-          </IconButton>
+          <FloraTooltip content="Search analytics" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
+            <IconButton
+              size="small"
+              className="flora-header-icon-20"
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Search analytics"
+            >
+              <Search className={FLORA_HEADER_ICON} />
+            </IconButton>
+          </FloraTooltip>
         )}
 
         {/* Flora Header.Separator — 24px tall, 4px horizontal margin */}
@@ -646,39 +649,45 @@ Automate this action with a trigger to reduce manual triage and help improve res
         {/* Analyst copilot — the gradient fill marks it as the one AI entry
             point in the header, so it reads as its own thing beside the plain
             monochrome utilities. */}
-        <button
-          type="button"
-          onClick={() => onToggleAnalyticsAssistant?.(!showAnalyticsAssistant)}
-          aria-label="Analyst copilot"
-          aria-pressed={showAnalyticsAssistant}
-          className="flex size-[32px] shrink-0 items-center justify-center rounded-[8px] transition-opacity hover:opacity-90"
-          style={{
-            backgroundImage:
-              'linear-gradient(135deg, rgb(141, 89, 177) 20%, rgb(64, 108, 196) 125%)',
-          }}
-        >
-          <Sparkles className="size-[16px] shrink-0 !text-white" />
-        </button>
+        <FloraTooltip content="Analyst copilot" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
+          <button
+            type="button"
+            onClick={() => onToggleAnalyticsAssistant?.(!showAnalyticsAssistant)}
+            aria-label="Analyst copilot"
+            aria-pressed={showAnalyticsAssistant}
+            className="flex size-[32px] shrink-0 items-center justify-center rounded-[8px] transition-opacity hover:opacity-90"
+            style={{
+              backgroundImage:
+                'linear-gradient(135deg, rgb(141, 89, 177) 20%, rgb(64, 108, 196) 125%)',
+            }}
+          >
+            <Sparkles className="size-[16px] shrink-0 !text-white" />
+          </button>
+        </FloraTooltip>
 
-        <IconButton
-          size="small"
-          className="flora-header-icon-20"
-          onClick={() => setShowHelpCenter(!showHelpCenter)}
-          aria-label="Help"
-        >
-          <HelpCircle className={FLORA_HEADER_ICON} />
-        </IconButton>
-
-        <div className="relative shrink-0 h-[32px] flex items-center">
+        <FloraTooltip content="Help" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
           <IconButton
             size="small"
-            onClick={() => setShowUserMenu(!showUserMenu)}
-            aria-label="User menu"
+            className="flora-header-icon-20"
+            onClick={() => setShowHelpCenter(!showHelpCenter)}
+            aria-label="Help"
           >
-            <div className="size-[20px] overflow-hidden rounded-full flex items-center justify-center">
-              <AvatarComponent />
-            </div>
+            <HelpCircle className={FLORA_HEADER_ICON} />
           </IconButton>
+        </FloraTooltip>
+
+        <div className="relative shrink-0 h-[32px] flex items-center">
+          <FloraTooltip content="User menu" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
+            <IconButton
+              size="small"
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              aria-label="User menu"
+            >
+              <div className="size-[20px] overflow-hidden rounded-full flex items-center justify-center">
+                <AvatarComponent />
+              </div>
+            </IconButton>
+          </FloraTooltip>
 
             {showUserMenu && (
               <>

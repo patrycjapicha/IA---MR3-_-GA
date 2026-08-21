@@ -253,9 +253,6 @@ function VolumeForecastChart() {
         </ResponsiveContainer>
       </div>
       <Legend items={[{ label: 'Actual', color: SERIES.blue }, { label: 'Forecast', color: MUTED }]} />
-      <Interpretation>
-        Demand has run above forecast every hour since 10:00, peaking 25% over plan at midday.
-      </Interpretation>
     </div>
   );
 }
@@ -287,9 +284,6 @@ function ChannelMixChart() {
         </ResponsiveContainer>
       </div>
       <Legend items={CHANNEL_SERIES.map((s) => ({ label: s.key, color: s.color }))} />
-      <Interpretation>
-        Messaging absorbed nearly all of the growth (+45% week on week) while email and voice stayed flat.
-      </Interpretation>
     </div>
   );
 }
@@ -326,9 +320,6 @@ function ContactDriverList() {
           </div>
         ))}
       </div>
-      <Interpretation>
-        Billing and refunds is up 18% and accounts for 78% of the total volume increase.
-      </Interpretation>
     </div>
   );
 }
@@ -379,9 +370,6 @@ function SlaTrendChart() {
         </ResponsiveContainer>
       </div>
       <Legend items={series.map((s) => ({ label: s.label, color: s.color }))} />
-      <Interpretation>
-        Response SLA has drifted 3 points; resolution SLA has fallen 10 and crossed below target in week 4.
-      </Interpretation>
     </div>
   );
 }
@@ -415,9 +403,6 @@ function SlaByPriorityChart() {
         </ResponsiveContainer>
       </div>
       <Legend items={[{ label: 'Attained', color: SERIES.blue }, { label: 'Target', color: '#dfe3e8' }]} />
-      <Interpretation>
-        Urgent and High are the only bands missing target — exactly the bands billing escalations land in.
-      </Interpretation>
     </div>
   );
 }
@@ -451,9 +436,6 @@ function CsatTrendChart() {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <Interpretation>
-        Up 1.5 points over five weeks and comfortably above the 92% target throughout.
-      </Interpretation>
     </div>
   );
 }
@@ -530,9 +512,6 @@ function TeamLoadChart() {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <Interpretation>
-        Billing is the only team above plan at 155%; Retention is running 26% under.
-      </Interpretation>
     </div>
   );
 }
@@ -576,9 +555,6 @@ function TeamDetailTable() {
           ))}
         </tbody>
       </TableShell>
-      <Interpretation>
-        Billing is the pressure point: a 212-ticket backlog against 155% capacity, with SLA down to 81%.
-      </Interpretation>
     </div>
   );
 }

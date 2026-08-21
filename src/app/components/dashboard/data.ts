@@ -457,7 +457,7 @@ export const tasks: Task[] = [
 export const memoryFolders: MemoryFolder[] = [
   {
     id: 1,
-    name: 'Support Tickets',
+    name: 'Customer support performance',
     description: 'Ticket management and workflow analytics',
     icon: <FileText className="w-5 h-5" />,
     color: 'bg-muted/20 text-foreground border-border',

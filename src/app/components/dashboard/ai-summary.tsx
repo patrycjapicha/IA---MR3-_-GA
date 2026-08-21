@@ -458,8 +458,13 @@ export function AiSummaryCard({
     .filter(Boolean)
     .join(' · ');
 
+  // Minimal height if no content - just empty div with no padding
+  if (!takeaway.text && findings.length === 0) {
+    return <div className="h-0 w-full" />;
+  }
+
   return (
-    <div className="flex h-full min-h-0 flex-col p-1 text-foreground">
+    <div className="flex h-full min-h-0 flex-col px-2 pt-2 pb-1 text-foreground">
       {/* Header: the takeaway leads and "AI summary" sits opposite it as a tag.
           A title repeating the tag would spend the widget's first line saying what
           it is, when the tag says that in the corner and the takeaway is what a
@@ -484,25 +489,18 @@ export function AiSummaryCard({
             </p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
-          {/* What wrote this, as a tag rather than a heading: it is provenance, and
-              a reader needs it once, at the edge, not as the first thing they
-              read. */}
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[13px] font-semibold leading-[18px]"
-            style={{ color: ACCENT, backgroundColor: `${ACCENT}14` }}
-          >
-            <SparklesStroke className="shrink-0" style={{ width: 13, height: 13, color: ACCENT }} />
-            AI summary
-          </span>
-          {headerAction}
-        </div>
+        {headerAction && (
+          <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+            {headerAction}
+          </div>
+        )}
       </div>
 
       {/* No rule under the header: the finding cards have their own edges now, and
           a divider above them was a third horizontal line in 20px of space. The
           gap does the separating. */}
-      <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
+      {findings.length > 0 && (
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
         {/* Findings are content in a flow rather than a fixed stack, because the
             typical placement is a full-width summary at the top of a dashboard —
             and three stacked findings across 1400px would be a column of text
@@ -526,48 +524,6 @@ export function AiSummaryCard({
           ))}
         </div>
       </div>
-
-      {/* The scope, as a caption under the whole summary: range, filter, age. It
-          answers "does this apply to what I am looking at", which is a question a
-          reader asks about the summary rather than about the takeaway — so it
-          reads after it, in the place a footnote goes, and it no longer sits in
-          the one gap where the eye is travelling from the lead to the evidence.
-          12px and the muted colour, below the widget's 13px floor because this is
-          the one line that is metadata rather than reading: it is looked up, not
-          read, and a caption at body size is a fourth thing competing with three
-          findings. It stays outside the scroll area so it is legible without
-          hunting for it in a narrowed widget.
-          The freshness caveat comes with it: the summary's age is in this line,
-          and an icon explaining it from the opposite corner of the card is a
-          footnote marker with nothing next to it. */}
-      {scope && (
-        <div className="mt-3 flex shrink-0 items-center gap-1 text-muted-foreground">
-          <p className="min-w-0 text-[12px] leading-[16px]">{scope}</p>
-          {/* The scope line carries the summary's own age; the data behind it
-              refreshes on a different clock, and conflating the two is what makes
-              a stale summary look current. The breakdown sits behind the icon
-              rather than in the line, because it is a caveat. */}
-          {(freshness.dataRefreshed || freshness.summaryUpdated) && (
-            <FloraTooltip
-              content={
-                <span className="flex flex-col gap-0.5">
-                  <span>{`Insights based on data refreshed ${freshness.dataRefreshed}`}</span>
-                  <span>{`Summary updated ${freshness.summaryUpdated}`}</span>
-                </span>
-              }
-              placement="top-start"
-              size="small"
-            >
-              <span
-                className="flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full hover:text-foreground"
-                onClick={(e) => e.stopPropagation()}
-                aria-label="AI summary freshness"
-              >
-                <InfoStroke className="shrink-0" style={{ width: 13, height: 13 }} />
-              </span>
-            </FloraTooltip>
-          )}
-        </div>
       )}
     </div>
   );
@@ -658,7 +614,7 @@ export const createAiSummaryContent = () => ({
 // every card. Each summary's copy is written to the same shape as a result — a
 // takeaway on one line, and no insight over three — because one constant has to
 // hold them all.
-export const AI_SUMMARY_BAND_HEIGHT = 258;
+export const AI_SUMMARY_BAND_HEIGHT = 16;
 
 // Everything a summary carries besides its copy: what wrote it, what it read,
 // and the authoring settings the contextual panel edits. Shared so a prebuilt
@@ -692,30 +648,8 @@ export const createSupportTicketsAiSummary = () =>
       scope: '',
       freshness: { dataRefreshed: '11 min ago', summaryUpdated: '7 min ago' },
     },
-    'Service is getting faster every week and [satisfaction is up 3.8 points](Satisfaction trend), but [urgent and high priority both miss the 90% SLA commitment](SLA attainment by priority).',
-    [
-      {
-        tone: 'high',
-        label: 'High impact',
-        headline: 'Urgent and high priority are missing the SLA commitment',
-        insight:
-          'Urgent finished inside SLA [82% of the time and high 88%, against a 90% commitment](SLA attainment by priority). [Escalations is the queue behind it, at 78% with 214 tickets waiting and 96% occupancy](Teams needing attention).',
-      },
-      {
-        tone: 'priority',
-        label: 'Priority finding',
-        headline: 'Chat has overtaken email, and billing drives the volume',
-        insight:
-          'Chat passed email in [week 31 and is now the busiest channel at 1,960 tickets a week](Ticket volume by channel, by week) as email keeps falling. [Billing and invoices is the single largest reason at 34% of contacts](Share of tickets by reason), and the fastest-growing driver is [SSO login loop after reset, up 34%](Top ticket drivers).',
-      },
-      {
-        tone: 'positive',
-        label: 'Positive finding',
-        headline: 'Reply and resolution times improved every week',
-        insight:
-          'First reply fell from [3.4 to 2.0 hours and full resolution from 9.1 to 5.8](First reply and full resolution time) across the six weeks, with no week going backwards. [Satisfaction rose in step, 90.4% to 94.2%](Satisfaction trend), so the speed did not come out of quality.',
-      },
-    ]
+    '',
+    []
   );
 
 // The executive service review's summary. The dashboard's own story is "faster,

@@ -40,11 +40,11 @@ interface DashboardTab {
   data?: any;
 }
 
-// The prototype boots with the Support Tickets dashboard already open, as a
+// The prototype boots with the Customer support performance dashboard already open, as a
 // reader would find it: named, populated, and in view mode. `isDefaultDashboard`
 // separates it from a dashboard the user creates while the prototype is running
 // (which starts blank, unnamed, and in edit mode).
-const DEFAULT_DASHBOARD_NAME = 'Support Tickets';
+const DEFAULT_DASHBOARD_NAME = 'Customer support performance';
 
 const createInitialDashboardTab = (): DashboardTab => ({
   id: 'dashboard-initial',

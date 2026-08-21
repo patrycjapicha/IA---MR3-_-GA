@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Anchor, Button as FloraButton, ChevronButton, Combobox, ComboboxField, Field, IconButton, Input as FloraInput, Item, ItemGroup, Menu, Modal, Option, Separator as FloraSeparator, SplitButton, MD, Table, Tag, Tabs, Textarea as FloraTextarea, Tooltip as FloraTooltip } from '@zendesk-ui/react-components';
 import { FloraSearchInput } from './FloraSearchInput';
@@ -496,6 +496,8 @@ function WidgetStyleControls({
           content={aiSummaryOn ? 'Remove AI summary' : 'Add AI summary'}
           placement="bottom"
           size="small"
+          appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+          zIndex={99999}
         >
           <button
             className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${
@@ -1497,6 +1499,7 @@ const mockReports = [
   { id: 'report-9', name: 'Escalation Trends', type: 'Support', lastUpdated: '2024-01-07', owner: 'John Smith', projectName: 'Support Operations', tags: [{ label: 'Support' }] },
   { id: 'report-10', name: 'Backlog Analysis', type: 'Analytics', lastUpdated: '2024-01-06', owner: 'Sarah Chen', projectName: 'Customer Experience Hub', tags: [{ label: 'Analytics' }, { label: 'Backlog' }] },
   { id: 'report-11', name: 'Channel Performance Overview', type: 'Performance', lastUpdated: '2024-01-05', owner: 'Michael Park', projectName: 'Support Operations', tags: [{ label: 'Performance' }, { label: 'Channels' }] },
+  { id: 'report-backlog', name: 'Current ticket backlog', type: 'Monitoring', lastUpdated: '2024-01-04', owner: 'Michael Park', projectName: 'Real-time Monitoring', tags: [{ label: 'Monitoring' }, { label: 'Backlog' }] },
   { id: 'report-12', name: 'Team Productivity Metrics', type: 'Performance', lastUpdated: '2024-01-04', owner: 'Emily Rodriguez', projectName: 'Real-time Monitoring', tags: [{ label: 'Performance' }] },
   { id: 'report-13', name: 'Customer Effort Score', type: 'KPI', lastUpdated: '2024-01-03', owner: 'John Smith', projectName: 'Customer Experience Hub', tags: [{ label: 'KPI' }, { label: 'CES' }] },
   { id: 'report-14', name: 'Ticket Reopen Rate', type: 'Analytics', lastUpdated: '2024-01-02', owner: 'Sarah Chen', projectName: 'Support Operations', tags: [{ label: 'Analytics' }] },
@@ -1513,6 +1516,7 @@ const REALTIME_REPORT_IDS = new Set([
   'report-2',
   'report-5',
   'report-8',
+  'report-backlog',
   'report-12',
   'report-15',
   'report-18',
@@ -3380,11 +3384,13 @@ type SavedView = {
 };
 
 // The filter row every dashboard opens with: a Last 30 days date range, and
-// nothing else. This is what Reset returns the row to, and what the row is
-// compared against to decide whether there is anything to reset — so the two can't
-// disagree about what "default" means.
+// default filters for region and channel. This is what Reset returns
+// the row to, and what the row is compared against to decide whether there is
+// anything to reset — so the two can't disagree about what "default" means.
 const DEFAULT_FILTERS: ActiveFilter[] = [
   { id: 'filter-default-date-range', label: 'Date Range', value: 'Last 30 days', typeId: 'date-range' },
+  { id: 'filter-default-region', label: 'Region', value: 'All Regions', typeId: 'region' },
+  { id: 'filter-default-channel', label: 'Channel', value: 'All Channels', typeId: 'channel' },
 ];
 // Off. A cross filter is something a reader creates by clicking into a figure, so
 // a dashboard that opens with one already applied is showing a slice nobody asked
@@ -3487,6 +3493,8 @@ function AddFilterMenu({
         content={toolTooltip('Add filter', ADD_FILTER_SHORTCUT)}
         placement="bottom-start"
         size="small"
+        appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+        zIndex={99999}
       >
         <DropdownMenuTrigger asChild>
           <Button
@@ -3679,7 +3687,7 @@ function SelectReportModal({
                       <div className="flex items-center gap-[8px]">
                         <BarChartIcon className={FLORA_LIBRARY_ICON} />
                         {REALTIME_REPORT_IDS.has(report.id) && (
-                          <FloraTooltip content="Real-time data" placement="top" size="small">
+                          <FloraTooltip content="Real-time data" placement="top" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                             <span className="relative flex size-[8px] shrink-0">
                               <span className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
                               <span className="relative size-[8px] rounded-full bg-green-500" />
@@ -4464,7 +4472,7 @@ function DashboardFilterValuePanel({
                   Clear all
                 </Anchor>
                 <DropdownMenu>
-                  <FloraTooltip content="Search options" placement="bottom-end" size="small">
+                  <FloraTooltip content="Search options" placement="bottom-end" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -4640,7 +4648,7 @@ function DashboardActiveFilter({
         </MD>
       )}
       {overflowCount > 0 && (
-        <FloraTooltip content={overflowValues.join(', ')} placement="bottom" size="small">
+        <FloraTooltip content={overflowValues.join(', ')} placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
           <span className="inline-flex shrink-0">
             <MD tag="span" className={FILTER_ACTIVE_OVERFLOW}>
               + {overflowCount} more
@@ -4773,6 +4781,38 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
   // The header readout has room for "30 sec", not "30 seconds".
   const refreshRateShortLabel =
     REFRESH_RATE_OPTIONS.find((o) => o.value === refreshRate)?.short ?? refreshRate;
+  // Helper function to refresh live data timestamps
+  const refreshLiveData = useCallback(() => {
+    setTabs((prevTabs) =>
+      prevTabs.map((tab) => {
+        if (tab.id !== activeTabId) return tab;
+
+        return {
+          ...tab,
+          contentItems: tab.contentItems.map((item) => {
+            // Only update items with liveData
+            if (!item.content?.liveData) return item;
+
+            // Update the lastRefreshed timestamp
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            });
+
+            return {
+              ...item,
+              content: {
+                ...item.content,
+                lastRefreshed: timeString,
+              },
+            };
+          }),
+        };
+      })
+    );
+  }, [activeTabId, setTabs]);
   // The split button's menu carries both halves of the schedule: whether it runs
   // at all, and how often. Picking a rate implies running — nobody chooses
   // "every 30 sec" to leave it paused — so it resumes too.
@@ -4783,6 +4823,11 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       // it starts on the default.
       if (!isAutoRefreshing && refreshRate === 'manual') setRefreshRate(REFRESH_RATE_DEFAULT);
       setIsAutoRefreshing(!isAutoRefreshing);
+      return;
+    }
+    if (changes.value === 'refresh-now') {
+      // Trigger an immediate refresh of live data
+      refreshLiveData();
       return;
     }
     if (changes.value.startsWith('rate:')) {
@@ -5108,6 +5153,18 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
       });
     }
   }, [contentItems, activeTabId]);
+
+  // Simulate data updates for real-time reports (with green dot) when auto-refresh is on
+  useEffect(() => {
+    if (!isAutoRefreshing) return;
+
+    const interval = setInterval(() => {
+      refreshLiveData();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [isAutoRefreshing, activeTabId, refreshLiveData]);
+
   // Resolved from the current tab's items, so the drawer closes on its own if the
   // summary it was editing is deleted or the author switches tabs.
   const aiSummarySettingsItem =
@@ -6056,7 +6113,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
           /* Borderless like edit mode's filter control beside it: the chips carry
              the borders in this row, and a framed button in front of them would
              read as another chip. */
-          <FloraTooltip content="Saved views" placement="bottom-start" size="small">
+          <FloraTooltip content="Saved views" placement="bottom-start" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -6187,7 +6244,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   <DropdownMenu open={isLocationMenuOpen} onOpenChange={setIsLocationMenuOpen}>
                     {/* The menu itself lists the breadcrumb trail, so the tooltip
                         only needs to name what the icon opens. */}
-                    <FloraTooltip content="Location" placement="bottom" size="small">
+                    <FloraTooltip content="Location" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
@@ -6240,6 +6297,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                         content={isStarred ? 'Remove from starred' : 'Add to starred'}
                         placement="bottom"
                         size="small"
+                        appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+                        zIndex={99999}
                       >
                         <button
                           type="button"
@@ -6277,7 +6336,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 <>
                 {/* Full screen belongs to reading, not authoring: it trades the
                     chrome for canvas, which only helps someone looking. */}
-                <FloraTooltip content="Full screen" placement="bottom" size="small">
+                <FloraTooltip content="Full screen" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                   <IconButton
                     isPill
                     size="small"
@@ -6300,12 +6359,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   {/* Both halves name the data they act on: a dashboard also
                       holds historical data, which this control never touches, so
                       "refresh" on its own would overclaim. */}
-                  <FloraTooltip content="Refresh real-time data now" placement="bottom" size="small">
+                  <FloraTooltip content="Refresh real-time data now" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                     {/* Icon-only, so the divider lands immediately after the
                         glyph rather than after a label the schedule half owns. */}
                     <IconButton
                       size="small"
-                      onClick={() => console.log('Reload dashboard')}
+                      onClick={refreshLiveData}
                       aria-label="Refresh real-time data now"
                       className="dashboard-icon-action"
                     >
@@ -6328,7 +6387,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     // menu behind it changes, so tapping the words that state the
                     // schedule is what opens the schedule.
                     button={(props) => (
-                      <FloraTooltip content="Real-time data refresh" placement="bottom" size="small">
+                      <FloraTooltip content="Real-time data refresh" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                       <FloraButton
                         {...props}
                         size="small"
@@ -6435,6 +6494,12 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     >
                       {isAutoRefreshing ? 'Pause refresh' : 'Resume refresh'}
                     </Item>
+                    <Item
+                      value="refresh-now"
+                      icon={<ArrowRotateRight className={FLORA_MENU_ICON} />}
+                    >
+                      Refresh now
+                    </Item>
                     {/* Everything above governs real-time data only; the rest of
                         the canvas is historical, on a daily job nobody can set
                         from here. So it closes as a footnote: the cadence alone,
@@ -6460,7 +6525,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               )}
               {isEditing && (
                 <div className="dashboard-history-actions flex items-center gap-0.5">
-                  <FloraTooltip content="Undo" placement="bottom" size="small">
+                  <FloraTooltip content="Undo" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                     <IconButton
                       isPill
                       size="small"
@@ -6470,7 +6535,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       <UndoReturn className={FLORA_BAR_ICON} style={FLORA_BAR_ICON_SIZE} />
                     </IconButton>
                   </FloraTooltip>
-                  <FloraTooltip content="Redo" placement="bottom" size="small">
+                  <FloraTooltip content="Redo" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                     <IconButton
                       isPill
                       size="small"
@@ -6490,6 +6555,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 content={isEditing ? 'Editing — switch to viewing' : 'Viewing — switch to editing'}
                 placement="bottom"
                 size="small"
+                appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+                zIndex={99999}
               >
                 <FloraButton
                   isPill
@@ -6567,7 +6634,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   the slot beside the primary button never changes width. */}
               <div className="flex h-8 w-8 shrink-0 items-center justify-center">
                 <DropdownMenu>
-                  <FloraTooltip content="More options" placement="bottom" size="small">
+                  <FloraTooltip content="More options" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                     <DropdownMenuTrigger asChild>
                       <IconButton isPill size="small" aria-label="More dashboard options" className="shrink-0">
                         <MoreVertical className={FLORA_BAR_ICON} style={FLORA_BAR_ICON_SIZE} />
@@ -6695,7 +6762,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
             {/* Event filter chip (from Figma) — sits next to the default time filter */}
             {showEventFilter && (
               <div className="inline-flex h-[32px] w-fit shrink-0 items-center gap-2 rounded-[8px] border border-[#dcdcda] bg-white px-2">
-                <FloraTooltip content="Cross filter" placement="bottom" size="small">
+                <FloraTooltip content="Cross filter" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                   <span className="inline-flex shrink-0">
                     <CheckSquareStroke className="text-[#2f3130]" style={{ width: 16, height: 16 }} aria-hidden />
                   </span>
@@ -6725,7 +6792,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 view is applied, since reset drops that too and a view whose
                 filters happen to match the default is still something to leave. */}
             {!isEditing && (!isFilterStateDefault || activeBookmarkId) && (
-              <FloraTooltip content="Reset filters" placement="bottom" size="small">
+              <FloraTooltip content="Reset filters" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -7346,7 +7413,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       <MD tag="span" className="!text-[12px] !text-muted-foreground truncate">
                         Last fetched {item.content?.lastFetched}
                       </MD>
-                      <FloraTooltip content="Fetch now" placement="bottom" size="small">
+                      <FloraTooltip content="Fetch now" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                         <button
                           type="button"
                           aria-label="Fetch now"
@@ -7763,6 +7830,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           content={isAutoRefreshing ? 'Real-time data' : 'Real-time data — refresh paused'}
                           placement="bottom-start"
                           size="small"
+                          appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+                          zIndex={99999}
                         >
                           <span
                             className="-mx-1 flex shrink-0 cursor-help p-1"
@@ -7791,6 +7860,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           content={item.title}
                           placement="bottom"
                           size="small"
+                          appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+                          zIndex={99999}
                         >
                           {/* Report titles run at 14px regular — the same step as
                               the dashboard's tab strip, so the two labels a
@@ -7817,6 +7888,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           content={widgetInfoNote(item)}
                           placement="bottom-start"
                           size="large"
+                          appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+                          zIndex={99999}
                         >
                           <span
                             className="mt-[3px] flex shrink-0 items-center justify-center text-[#68737d] hover:text-foreground cursor-help"
@@ -7866,7 +7939,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                       )}
                       {item.type === 'chart' && (
                         <DropdownMenu>
-                          <FloraTooltip content="More actions" placement="bottom" size="small">
+                          <FloraTooltip content="More actions" placement="bottom" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
@@ -8569,6 +8642,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     content={toolTooltip(tool.label, tool.shortcut)}
                     placement="top"
                     size="small"
+                    appendToNode={typeof document !== 'undefined' ? document.body : undefined}
+                    zIndex={99999}
                   >
                     <Button
                       variant={selectedTool === tool.id ? "secondary" : "ghost"}
@@ -8590,7 +8665,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                     row's own position — so an author looks in the same place. */}
                 {(overflowTools.length > 0 || overflowTrailingTools.length > 0) && (
                   <DropdownMenu open={isToolOverflowMenuOpen} onOpenChange={setIsToolOverflowMenuOpen}>
-                    <FloraTooltip content="More tools" placement="top" size="small">
+                    <FloraTooltip content="More tools" placement="top" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
@@ -8649,7 +8724,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   />
 
                   {visibleTrailingTools.map((tool) => (
-                    <FloraTooltip key={tool.id} content={tool.label} placement="top" size="small">
+                    <FloraTooltip key={tool.id} content={tool.label} placement="top" size="small" appendToNode={typeof document !== 'undefined' ? document.body : undefined} zIndex={99999}>
                       <Button
                         variant="ghost"
                         size="sm"

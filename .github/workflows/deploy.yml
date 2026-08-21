@@ -16,8 +16,11 @@ jobs:
           # Previous version, frozen at the v1 tag. Served at the site root.
           - name: v1
             ref: v1
-          # Current work on main. Served at /v2/.
+          # Previous version at /v2/
           - name: v2
+            ref: v2
+          # Current work on main. Served at /v3/.
+          - name: v3
             ref: main
 
     steps:
@@ -68,6 +71,12 @@ jobs:
         with:
           name: build-v2
           path: ./site/v2
+
+      - name: Download v3 build
+        uses: actions/download-artifact@v4
+        with:
+          name: build-v3
+          path: ./site/v3
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

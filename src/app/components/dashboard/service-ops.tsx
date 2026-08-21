@@ -369,9 +369,6 @@ function StackedChannelChart() {
         </ResponsiveContainer>
       </div>
       <Legend items={series.map((s) => ({ label: s.key, color: s.color }))} />
-      <Interpretation>
-        Chat has overtaken email as the busiest channel — up 62% over six weeks while email fell 16%.
-      </Interpretation>
     </div>
   );
 }
@@ -499,10 +496,6 @@ function LiveQueueChart() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        <Interpretation>
-          Arrivals have outpaced replies for the last half hour — the queue is up{' '}
-          {current - halfHourAgo} tickets since then, after holding near 120 earlier in the hour.
-        </Interpretation>
       </div>
     </div>
   );
@@ -546,9 +539,6 @@ function ResponsivenessChart() {
         </ResponsiveContainer>
       </div>
       <Legend items={series.map((s) => ({ label: s.label, color: s.color }))} />
-      <Interpretation>
-        Both measures improved every week; full resolution is now 5.8 h, down from 9.1 h in week 27.
-      </Interpretation>
     </div>
   );
 }
@@ -588,9 +578,6 @@ function SlaByPriorityChart() {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <Interpretation>
-        Urgent (82%) and High (88%) sit below the 90% commitment — everything else clears it.
-      </Interpretation>
     </div>
   );
 }
@@ -631,9 +618,6 @@ function CsatTrendChart() {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <Interpretation>
-        Satisfaction climbed 3.8 points across the period, tracking the drop in resolution time.
-      </Interpretation>
     </div>
   );
 }
@@ -660,9 +644,6 @@ function TeamVolumeChart() {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <Interpretation>
-        The two Tier 1 teams closed 55% of all solved tickets; Escalations carries the lowest volume but the longest handle time.
-      </Interpretation>
     </div>
   );
 }
@@ -706,9 +687,6 @@ function TopIssuesTable() {
           ))}
         </tbody>
       </TableShell>
-      <Interpretation>
-        SSO login loops grew fastest (+34%) and carry the lowest satisfaction — the clearest fix-once candidate.
-      </Interpretation>
     </div>
   );
 }
@@ -738,9 +716,6 @@ function TeamAttentionTable() {
           ))}
         </tbody>
       </TableShell>
-      <Interpretation>
-        Escalations is the pressure point: 96% occupancy leaves no headroom, and SLA has slipped to 78%.
-      </Interpretation>
     </div>
   );
 }

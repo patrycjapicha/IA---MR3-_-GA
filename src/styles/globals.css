@@ -285,6 +285,15 @@ html {
   font-size: var(--font-size);
 }
 
+/* Ensure all tooltips appear above everything else */
+[data-garden-id*='tooltip'],
+[data-garden-id^='tooltips.'],
+[role='tooltip'],
+.tooltip,
+[class*='tooltip'] {
+  z-index: 99999 !important;
+}
+
 /* Filter chips open the value panel in both editing and viewing, so they need a
    hover state that reads as clickable rather than as static metadata. */
 button.dashboard-active-filter:hover {

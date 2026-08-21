@@ -104,6 +104,22 @@ interface TemplatesSectionProps {
 // Zendesk pre-created templates
 const zendeskTemplates = [
   {
+    id: 'dashboard-initial',
+    title: 'Customer support performance',
+    description: 'Ticket management and workflow analytics dashboard',
+    type: 'dashboard',
+    icon: <LayoutIcon className={FLORA_LIBRARY_ICON} />,
+    category: 'Support',
+    projectName: 'Support Analytics',
+    owner: 'Support Team',
+    lastUpdated: 'Feb 18, 2026 3:25 PM',
+    tags: [
+      { label: 'support', color: '#1F73B7' },
+      { label: 'tickets', color: '#68737D' },
+      { label: 'performance', color: '#68737D' }
+    ]
+  },
+  {
     id: 'template-1',
     title: 'Agent Performance Dashboard',
     description: 'Track individual and team agent metrics including resolution rates, response times, and customer satisfaction scores',
@@ -720,6 +736,21 @@ const createdByMeProjects = [
 // Shared with me projects
 const sharedWithMeProjects = [
   {
+    id: 'dashboard-initial',
+    title: 'Customer support performance',
+    description: 'Ticket management and workflow analytics dashboard',
+    type: 'dashboard',
+    icon: <LayoutIcon className={FLORA_LIBRARY_ICON} />,
+    category: 'Support',
+    owner: 'Support Team',
+    sharedDate: 'Feb 18, 2026',
+    tags: [
+      { label: 'support', color: '#1F73B7' },
+      { label: 'tickets', color: '#68737D' },
+      { label: 'shared', color: '#AC5918' }
+    ]
+  },
+  {
     id: 'shared-project-1',
     title: 'Q1 Performance Review',
     description: 'Comprehensive Q1 performance analysis with key metrics and trends',
@@ -1006,7 +1037,7 @@ export function TemplatesSection({ onOpenDashboard, isNavCollapsed: externalIsNa
     let matchesNavItem = true;
     if (activeNavItem === 'recents') {
       // Mock: Show recent templates and projects
-      matchesNavItem = ['template-12', 'template-11', 'template-10', 'project-2', 'my-project-1', 'shared-project-1'].includes(template.id);
+      matchesNavItem = ['dashboard-initial', 'template-12', 'template-11', 'template-10', 'project-2', 'my-project-1', 'shared-project-1'].includes(template.id);
     } else if (activeNavItem === 'starred') {
       matchesNavItem = starredIds.has(template.id);
     } else if (activeNavItem === 'archived') {
