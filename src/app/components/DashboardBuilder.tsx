@@ -861,7 +861,7 @@ function reportProvenance(content: any) {
 // is already answered by the green dot beside the title — a fixed "Updated 10:42
 // AM" under streaming data reads as staleness that isn't there. So the feed's name
 // is the whole footer.
-function ReportProvenanceMenuFooter({ content }: { content: any }) {
+function ReportProvenanceMenuFooter({ content, isEditing }: { content: any; isEditing?: boolean }) {
   const { isLive, dataset, cadence, updated } = reportProvenance(content);
   return (
     <>
@@ -872,12 +872,14 @@ function ReportProvenanceMenuFooter({ content }: { content: any }) {
       <div className="px-3 pb-1 pt-1 text-xs text-[#68737d]">
         <div className="flex items-center gap-1.5">
           <DatabaseStroke
-            className="shrink-0 fill-current !text-[#68737d]"
+            className="shrink-0 fill-current !text-[#2f3130]"
             style={{ width: 12, height: 12 }}
           />
           {/* The dataset can be long, so it is the part that gives way — the
               cadence beside it is short and fixed. */}
           <span className="min-w-0 truncate text-[#2f3130]" title={dataset}>{dataset}</span>
+          {/* Only show refresh rate and icons for non-live reports. Live/realtime
+              reports show only the dataset name. */}
           {!isLive && (
             <>
               <span aria-hidden className="shrink-0 text-[#c2c8cc]">·</span>
@@ -889,15 +891,16 @@ function ReportProvenanceMenuFooter({ content }: { content: any }) {
                 title={`Refreshes ${cadence.toLowerCase()}`}
               >
                 <ArrowRotateRight
-                  className="shrink-0 fill-current !text-[#68737d]"
+                  className="shrink-0 fill-current !text-[#2f3130]"
                   style={{ width: 12, height: 12 }}
                 />
-                {cadence}
+                <span className="text-[#2f3130]">{cadence}</span>
               </span>
             </>
           )}
         </div>
-        {!isLive && <div>{updated}</div>}
+        {/* Only show updated time for non-live reports. */}
+        {!isLive && <div className="text-[#2f3130]">{updated}</div>}
       </div>
     </>
   );
@@ -1489,6 +1492,7 @@ const chartTypes = [
 
 const mockReports = [
   { id: 'report-1', name: 'Customer Support Analytics', type: 'Support', lastUpdated: '2024-01-15', owner: 'John Smith', projectName: 'Customer Experience Hub', tags: [{ label: 'Support' }, { label: 'Analytics' }] },
+  { id: 'report-frt-channel', name: 'First reply time by channel', type: 'KPI', lastUpdated: '2024-01-14', owner: 'Sarah Chen', projectName: 'Real-time Monitoring', tags: [{ label: 'KPI' }, { label: 'Channels' }] },
   { id: 'report-2', name: 'Resolution Time Analysis', type: 'KPI', lastUpdated: '2024-01-14', owner: 'Sarah Chen', projectName: 'Real-time Monitoring', tags: [{ label: 'KPI' }, { label: 'Performance' }] },
   { id: 'report-3', name: 'Agent Performance Dashboard', type: 'Performance', lastUpdated: '2024-01-13', owner: 'Michael Park', projectName: 'Support Operations', tags: [{ label: 'Performance' }] },
   { id: 'report-4', name: 'Ticket Volume Trends', type: 'Analytics', lastUpdated: '2024-01-12', owner: 'Emily Rodriguez', projectName: 'Customer Experience Hub', tags: [{ label: 'Analytics' }, { label: 'Trends' }] },
@@ -1497,9 +1501,8 @@ const mockReports = [
   { id: 'report-7', name: 'Customer Satisfaction Analysis', type: 'Analytics', lastUpdated: '2024-01-09', owner: 'Michael Park', projectName: 'Customer Experience Hub', tags: [{ label: 'Analytics' }, { label: 'CSAT' }] },
   { id: 'report-8', name: 'Response Time Monitoring', type: 'KPI', lastUpdated: '2024-01-08', owner: 'Emily Rodriguez', projectName: 'Real-time Monitoring', tags: [{ label: 'KPI' }, { label: 'Monitoring' }] },
   { id: 'report-9', name: 'Escalation Trends', type: 'Support', lastUpdated: '2024-01-07', owner: 'John Smith', projectName: 'Support Operations', tags: [{ label: 'Support' }] },
-  { id: 'report-10', name: 'Backlog Analysis', type: 'Analytics', lastUpdated: '2024-01-06', owner: 'Sarah Chen', projectName: 'Customer Experience Hub', tags: [{ label: 'Analytics' }, { label: 'Backlog' }] },
   { id: 'report-11', name: 'Channel Performance Overview', type: 'Performance', lastUpdated: '2024-01-05', owner: 'Michael Park', projectName: 'Support Operations', tags: [{ label: 'Performance' }, { label: 'Channels' }] },
-  { id: 'report-backlog', name: 'Current ticket backlog', type: 'Monitoring', lastUpdated: '2024-01-04', owner: 'Michael Park', projectName: 'Real-time Monitoring', tags: [{ label: 'Monitoring' }, { label: 'Backlog' }] },
+  { id: 'report-backlog', name: 'Ticket backlog', type: 'Monitoring', lastUpdated: '2024-01-04', owner: 'Michael Park', projectName: 'Real-time Monitoring', tags: [{ label: 'Monitoring' }, { label: 'Backlog' }] },
   { id: 'report-12', name: 'Team Productivity Metrics', type: 'Performance', lastUpdated: '2024-01-04', owner: 'Emily Rodriguez', projectName: 'Real-time Monitoring', tags: [{ label: 'Performance' }] },
   { id: 'report-13', name: 'Customer Effort Score', type: 'KPI', lastUpdated: '2024-01-03', owner: 'John Smith', projectName: 'Customer Experience Hub', tags: [{ label: 'KPI' }, { label: 'CES' }] },
   { id: 'report-14', name: 'Ticket Reopen Rate', type: 'Analytics', lastUpdated: '2024-01-02', owner: 'Sarah Chen', projectName: 'Support Operations', tags: [{ label: 'Analytics' }] },
@@ -5932,26 +5935,78 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     const at = pendingInsertAtRef.current;
     pendingInsertAtRef.current = null;
 
-    // Create KPI automated resolution time chart based on selected report
-    const newItem: ContentItem = {
-      id: `kpi-resolution-${Date.now()}`,
-      type: 'chart',
-      position: resolvePosition({ width: 350, height: 250 }, at),
-      size: { width: 350, height: 250 },
-      title: `${selectedReport?.name} - Resolution Time KPI`,
-      content: {
-        chartType: 'kpi-resolution-time',
-        reportSource: selectedReport?.name,
-        reportType: selectedReport?.type,
-        kpiData: {
-          averageResolutionTime: '2.3 hours',
-          trend: '+12%',
-          lastUpdated: selectedReport?.lastUpdated
-        },
-        // Reports default to a stroke/border with no drop shadow
-        style: { shadow: false, border: true }
-      }
-    };
+    let newItem: ContentItem;
+
+    // Create specific chart content based on report ID
+    if (reportId === 'report-frt-channel') {
+      // First reply time by channel - bar chart with channel comparison
+      newItem = {
+        id: `frt-channel-${Date.now()}`,
+        type: 'chart',
+        position: resolvePosition({ width: 450, height: 300 }, at),
+        size: { width: 450, height: 300 },
+        title: 'First reply time by channel',
+        content: {
+          chartType: 'first-reply-time-channel',
+          reportSource: selectedReport?.name,
+          reportType: selectedReport?.type,
+          channelData: [
+            { channel: 'Email', avgTime: 45, unit: 'min', color: '#1f77b4' },
+            { channel: 'Chat', avgTime: 8, unit: 'min', color: '#ff7f0e' },
+            { channel: 'Phone', avgTime: 12, unit: 'min', color: '#2ca02c' },
+            { channel: 'Social', avgTime: 32, unit: 'min', color: '#d62728' },
+            { channel: 'SMS', avgTime: 18, unit: 'min', color: '#9467bd' }
+          ],
+          style: { shadow: false, border: true }
+        }
+      };
+    } else if (reportId === 'report-backlog') {
+      // Ticket backlog - real-time KPI with live count
+      newItem = {
+        id: `backlog-${Date.now()}`,
+        type: 'chart',
+        position: resolvePosition({ width: 350, height: 250 }, at),
+        size: { width: 350, height: 250 },
+        title: 'Ticket backlog',
+        content: {
+          chartType: 'kpi-backlog',
+          reportSource: selectedReport?.name,
+          reportType: selectedReport?.type,
+          kpiData: {
+            currentBacklog: 287,
+            trend: '-8%',
+            trendDirection: 'down',
+            comparisonPeriod: 'vs 1 hour ago',
+            urgentCount: 12,
+            highCount: 45
+          },
+          liveData: true,
+          dataset: 'Real-time monitoring',
+          lastUpdated: 'Just now',
+          style: { shadow: false, border: true }
+        }
+      };
+    } else {
+      // Default KPI chart for other reports
+      newItem = {
+        id: `kpi-resolution-${Date.now()}`,
+        type: 'chart',
+        position: resolvePosition({ width: 350, height: 250 }, at),
+        size: { width: 350, height: 250 },
+        title: `${selectedReport?.name} - Resolution Time KPI`,
+        content: {
+          chartType: 'kpi-resolution-time',
+          reportSource: selectedReport?.name,
+          reportType: selectedReport?.type,
+          kpiData: {
+            averageResolutionTime: '2.3 hours',
+            trend: '+12%',
+            lastUpdated: selectedReport?.lastUpdated
+          },
+          style: { shadow: false, border: true }
+        }
+      };
+    }
 
     // Added, not selected. A report's contextual toolbar carries the whole
     // cross-filtering panel, which is tall enough to cover the report it belongs
@@ -7908,7 +7963,13 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                               Long names wrap onto a second line rather than
                               being cut off — the name identifies the figure, so
                               reading it matters more than a fixed row height. */}
-                          <span className="min-w-0 line-clamp-2 break-words text-foreground text-[14px] leading-[20px] font-normal">
+                          <span className="min-w-0 line-clamp-2 break-words text-foreground text-[14px] leading-[20px] font-normal flex items-center gap-[8px]">
+                            {item.content?.isRealtime && (
+                              <span className="relative flex size-[8px] shrink-0">
+                                <span className="absolute inset-0 rounded-full bg-green-500 animate-ping" />
+                                <span className="relative size-[8px] rounded-full bg-green-500" />
+                              </span>
+                            )}
                             {item.title}
                           </span>
                         </FloraTooltip>
@@ -8052,7 +8113,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                                 </DropdownMenuItem>
                               </>
                             )}
-                            <ReportProvenanceMenuFooter content={item.content} />
+                            <ReportProvenanceMenuFooter content={item.content} isEditing={isEditing} />
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -8483,7 +8544,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                   {item.content?.chartType === 'kpi-resolution-time' && (
                     <div className="flex-1 flex flex-col justify-center px-6 py-4">
                       <div className="text-center mb-4">
-                        
+
                         <div className="text-4xl font-medium text-foreground">
                           {item.content.kpiData?.averageResolutionTime || '2.3 hours'}
                         </div>
@@ -8505,7 +8566,57 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                           </>
                         )}
                       </div>
-                      
+
+                    </div>
+                  )}
+
+                  {item.content?.chartType === 'first-reply-time-channel' && (
+                    <div className="flex-1 flex flex-col px-6 py-4">
+                      <div className="flex-1 flex items-end gap-3 pb-4">
+                        {item.content.channelData?.map((channel: any, idx: number) => (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-2">
+                            <div
+                              className="w-full rounded-t transition-all hover:opacity-80"
+                              style={{
+                                backgroundColor: channel.color,
+                                height: `${(channel.avgTime / 50) * 100}%`,
+                                minHeight: '40px'
+                              }}
+                            />
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-foreground">{channel.avgTime}{channel.unit}</div>
+                              <div className="text-xs text-muted-foreground">{channel.channel}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {item.content?.chartType === 'kpi-backlog' && (
+                    <div className="flex-1 flex flex-col justify-center px-6 py-4">
+                      <div className="text-center mb-4">
+                        <div className="text-4xl font-medium text-foreground">
+                          {item.content.kpiData?.currentBacklog || 287}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">tickets in backlog</div>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                        <TrendingUp className={`${FLORA_ICON} ${item.content.kpiData?.trendDirection === 'down' ? 'rotate-180 text-green-600' : 'text-red-600'}`} />
+                        <span className={`text-sm ${item.content.kpiData?.trendDirection === 'down' ? 'text-green-600' : 'text-red-600'}`}>
+                          {item.content.kpiData?.trend || '-8%'} {item.content.kpiData?.comparisonPeriod || 'vs 1 hour ago'}
+                        </span>
+                      </div>
+                      <div className="flex gap-4 justify-center text-xs">
+                        <div className="text-center">
+                          <div className="font-medium text-red-600">{item.content.kpiData?.urgentCount || 12}</div>
+                          <div className="text-muted-foreground">Urgent</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium text-orange-600">{item.content.kpiData?.highCount || 45}</div>
+                          <div className="text-muted-foreground">High</div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
