@@ -5855,7 +5855,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     }, RELOAD_DATA_MS);
 
     return () => clearTimeout(updateTimer);
-  }, [activeFilters, activeTabId, isFilterStateDefault, simulateDashboardReload, setTabs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilters, activeTabId, isFilterStateDefault]);
 
   const handleApplySavedView = (viewId: string) => {
     const view = savedFilteredViews.find(v => v.id === viewId);
