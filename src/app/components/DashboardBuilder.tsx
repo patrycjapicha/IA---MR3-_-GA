@@ -141,7 +141,7 @@ const FLORA_ICON = 'size-[16px] shrink-0 text-muted-foreground';
 // The toolbar's glyphs are a step below Flora's 20px default: the row floats on
 // the canvas now rather than sitting in the header bar, and at that size the
 // tools crowd their own frame. Same 16px as the menus these tools also appear in.
-const FLORA_TOOLBAR_ICON = 'size-[16px] shrink-0 text-muted-foreground';
+const FLORA_TOOLBAR_ICON = 'size-[18px] shrink-0 text-muted-foreground';
 const FLORA_LIBRARY_ICON = 'size-[16px] shrink-0 fill-current !text-muted-foreground';
 const FLORA_TABLE_PRIMARY = 'm-0';
 const FLORA_TAB_ADD_ICON = '!size-[16px] shrink-0';

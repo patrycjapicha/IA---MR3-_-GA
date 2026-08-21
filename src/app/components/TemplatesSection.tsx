@@ -18,7 +18,7 @@ import { DatasetsSection } from './DatasetsSection';
 import { Switch } from './ui/switch';
 
 const FLORA_LIBRARY_ICON = 'size-[16px] shrink-0 fill-current !text-muted-foreground';
-const FLORA_TOOLBAR_BTN_ICON = '!size-[16px] shrink-0';
+const FLORA_TOOLBAR_BTN_ICON = '!size-[18px] shrink-0';
 const FLORA_TABLE_PRIMARY = 'm-0';
 
 function floraTableHeader(label: string) {
