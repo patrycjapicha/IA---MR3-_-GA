@@ -345,8 +345,9 @@ function WidgetReloadOverlay({
       style={{ backdropFilter: 'blur(1px)' }}
       aria-live="polite"
       aria-busy="true"
+      aria-label={label}
     >
-      <span className="flex items-center gap-2 rounded-full border border-[#dcdcda] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
+      <span className="flex items-center justify-center rounded-full border border-[#dcdcda] bg-white p-2 shadow-[0_2px_8px_rgba(0,0,0,0.08)]">
         {variant === 'summary' ? (
           // The summary is being written, not fetched, so it gets the mark that
           // says so everywhere else in the dashboard rather than a spinner.
@@ -354,7 +355,6 @@ function WidgetReloadOverlay({
         ) : (
           <ArrowRotateRight className="size-[14px] shrink-0 animate-spin text-muted-foreground" style={{ width: 14, height: 14 }} />
         )}
-        <span className="text-[13px] leading-[18px] text-muted-foreground">{label}</span>
       </span>
     </div>
   );
@@ -7787,10 +7787,7 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
                 onClick={(e) => { e.stopPropagation(); if (isEditing) setSelectedItemId(item.id); }}
               >
                 {widgetReloading && (
-                  <WidgetReloadOverlay
-                    variant="data"
-                    label="Refreshing…"
-                  />
+                  <WidgetReloadOverlay variant="data" label="Refreshing…" />
                 )}
                 {isEditing && isWidgetSelected && (
                   <ResizeHandles onResizeStart={(e, dir) => handleResizeStart(e, item, dir)} />
