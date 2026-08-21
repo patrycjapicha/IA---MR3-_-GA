@@ -2143,7 +2143,7 @@ function createStTabItems({
   return items;
 }
 
-// ---- Right now ----------------------------------------------------------
+// ---- Current state ----------------------------------------------------------
 // The tab's one live report, and the reason it leads: a reader opening this
 // dashboard mid-shift wants to know what is happening now before they read what
 // happened over the period. Everything below this band is the period; this band is
@@ -2154,7 +2154,7 @@ function createStTabItems({
 // another band to study, which is what the rows below are for.
 const ST_LIVE_BAND = {
   key: 'live',
-  title: 'Right now',
+  title: 'Current state',
   rowHeight: ST_LIVE_ROW_H,
   reports: [
     {
