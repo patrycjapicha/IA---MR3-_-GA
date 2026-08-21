@@ -5757,60 +5757,30 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
     setIsBookmarkModified(false);
   };
 
-  // Reloading in two stages: 'data' while the reports refetch, then 'summary'
-  // while the AI summary is rewritten from what came back. One value rather than
-  // two booleans, because the stages are sequential — nothing is ever in both.
-  type ReloadPhase = 'idle' | 'data' | 'summary';
+  // Reloading shows 'data' phase while the reports refetch.
+  type ReloadPhase = 'idle' | 'data';
   const [reloadPhase, setReloadPhase] = useState<ReloadPhase>('idle');
-  const reloadTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const reloadTimersRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isReloading = reloadPhase !== 'idle';
 
-  useEffect(() => () => reloadTimersRef.current.forEach(clearTimeout), []);
-
-  // Dates every AI summary to now, across all tabs: the whole dashboard reloaded,
-  // not just the tab that happened to be open.
-  const stampSummariesRefreshed = () => {
-    setTabs(prevTabs =>
-      prevTabs.map(tab => ({
-        ...tab,
-        contentItems: tab.contentItems.map(item =>
-          isAiSummaryChart(item.content?.chartType)
-            ? {
-                ...item,
-                content: {
-                  ...item.content,
-                  freshness: { dataRefreshed: 'just now', summaryUpdated: 'just now' },
-                },
-              }
-            : item
-        ),
-      }))
-    );
-  };
+  useEffect(() => () => { if (reloadTimersRef.current) clearTimeout(reloadTimersRef.current); }, []);
 
   // Applying a view changes what every widget is reading, so the dashboard has to
   // go and read it again. Without that the filter row changes and nothing else
   // does, which reads as the view not having applied — the numbers look like they
   // were already the answer.
   const simulateDashboardReload = () => {
-    if (reloadTimersRef.current.length) {
+    if (reloadTimersRef.current) {
       // A second view applied mid-reload restarts the run rather than racing the
-      // first one's timers to 'idle'.
-      reloadTimersRef.current.forEach(clearTimeout);
-      reloadTimersRef.current = [];
+      // first one's timer to 'idle'.
+      clearTimeout(reloadTimersRef.current);
+      reloadTimersRef.current = null;
     }
     setReloadPhase('data');
-    reloadTimersRef.current = [
-      setTimeout(() => setReloadPhase('summary'), RELOAD_DATA_MS),
-      setTimeout(() => {
-        setReloadPhase('idle');
-        reloadTimersRef.current = [];
-        // The summary's own footnote is how a reader dates it, so it has to move
-        // when the summary is rewritten — a fresh summary still claiming it read
-        // hour-old data is the one part of this that would be a lie.
-        stampSummariesRefreshed();
-      }, RELOAD_DATA_MS + RELOAD_SUMMARY_MS),
-    ];
+    reloadTimersRef.current = setTimeout(() => {
+      setReloadPhase('idle');
+      reloadTimersRef.current = null;
+    }, RELOAD_DATA_MS);
   };
 
   // Simulate data updates when filters are applied
@@ -7798,14 +7768,10 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               // is no card edge to do that work for it.
               const isSectionWidget = item.type !== 'image' && wBg === 'transparent' && !wBorder;
               const isWidgetSelected = isEditing && selectedItemId === item.id;
-              // What reloads, and for how long. A report is done once its rows are
-              // back; a summary is written from those rows, so it stays busy
-              // through both stages and settles last. Text, images, separators and
-              // parameters hold no data — nothing to refetch, so they don't flicker.
-              const isAiSummaryWidget = isAiSummaryChart(item.content?.chartType);
-              const widgetReloading =
-                isReloading &&
-                (isAiSummaryWidget ? true : item.type === 'chart' && reloadPhase === 'data');
+              // What reloads: charts and reports refetch their data. Text, images,
+              // separators and parameters hold no data — nothing to refetch, so they
+              // don't flicker.
+              const widgetReloading = isReloading && item.type === 'chart';
               return (
               <div
                 key={item.id}
@@ -7822,8 +7788,8 @@ export function DashboardBuilder({ dashboardTitle, projectName, onSave, onCancel
               >
                 {widgetReloading && (
                   <WidgetReloadOverlay
-                    variant={isAiSummaryWidget ? 'summary' : 'data'}
-                    label={isAiSummaryWidget ? 'Rewriting summary…' : 'Refreshing…'}
+                    variant="data"
+                    label="Refreshing…"
                   />
                 )}
                 {isEditing && isWidgetSelected && (
